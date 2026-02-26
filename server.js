@@ -40,8 +40,11 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
       // Extract thumbnail from media:thumbnail
       const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
       if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
+      // Extract text excerpt from content
+      const decoded = decodeHtmlEntities(content);
+      const excerpt = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
       const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
-      posts.push({ title, url: link, permalink: link, created, image, score: 0, num_comments: 0, flair: '' });
+      posts.push({ title, url: link, permalink: link, created, image, excerpt, flair: '' });
     }
     res.json({ posts, subreddit: sub });
   } catch (e) {
@@ -245,10 +248,14 @@ function getNeighborhoodPage(slug) {
       if (!epoch) return '';
       const diff = Date.now() / 1000 - epoch;
       if (diff < 0) return '';
-      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
-      return Math.floor(diff / 2592000) + 'mo ago';
+      const m = Math.floor(diff / 60);
+      if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
+      const h = Math.floor(diff / 3600);
+      if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+      const d = Math.floor(diff / 86400);
+      if (d < 30) return d + (d === 1 ? ' day ago' : ' days ago');
+      const mo = Math.floor(diff / 2592000);
+      return mo + (mo === 1 ? ' month ago' : ' months ago');
     }
 
     function esc(s) {
@@ -275,7 +282,7 @@ function getNeighborhoodPage(slug) {
             source: 'reddit',
             meta: '',
             flair: p.flair || '',
-            excerpt: '',
+            excerpt: p.excerpt || '',
             image: p.image || '',
           });
         });
@@ -339,10 +346,7 @@ function getNeighborhoodPage(slug) {
         li.innerHTML =
           (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
-          '<span class="meta">' +
-            '<span class="source-badge source-' + item.source + '">' + sourceLabel + '</span>' +
-            (date ? ' · ' + date : '') +
-          '</span>' +
+          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
           (item.flair ? '<span class="flair">' + esc(item.flair) + '</span>' : '') +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '');
 
@@ -377,10 +381,6 @@ function getStyles() {
     .sources a { color: #1a73e8; text-decoration: none; margin-left: 8px; }
     .sources a:hover { text-decoration: underline; }
     .feed-container { max-width: 720px; }
-    .source-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .source-reddit { background: #ff45001a; color: #ff4500; }
-    .source-qns { background: #0a66c21a; color: #0a66c2; }
-    .source-yimby { background: #2e7d321a; color: #2e7d32; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
     .post-item { padding: 14px; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
