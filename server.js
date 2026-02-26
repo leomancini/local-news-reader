@@ -433,6 +433,7 @@ app.get('/:neighborhood', (req, res) => {
 
 app.get('/:neighborhood/settings', (req, res) => {
   const slug = req.params.neighborhood;
+  if (req.query.partial) return res.send(getSettingsPartial(slug));
   res.send(getSettingsPage(slug));
 });
 
@@ -486,17 +487,15 @@ function getNeighborhoodPage(slug) {
 <body>
   <div class="container">
     <header>
-      <div class="header-row">
-        <h1>${displayName}</h1>
-        <a href="/${slug}/settings" class="settings-link" aria-label="Settings">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </a>
-      </div>
+      <h1>${displayName}</h1>
       <div class="filter-tabs">
         <button class="filter-tab active" data-source="all">All</button>
         <button class="filter-tab" data-source="reddit">Reddit</button>
         <button class="filter-tab" data-source="qns">QNS</button>
         <button class="filter-tab" data-source="yimby">YIMBY</button>
+        <a href="/${slug}/settings" class="settings-link" aria-label="Settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </a>
       </div>
     </header>
 
@@ -644,6 +643,72 @@ function getNeighborhoodPage(slug) {
       .catch(() => {
         document.getElementById('loading').textContent = 'Failed to load news';
       });
+
+    // Instant settings navigation
+    let feedHTML = null;
+
+    function initSettingsToggle() {
+      const toggle = document.getElementById('crimeToggle');
+      if (!toggle) return;
+      if (localStorage.getItem('showCrime') === '1') toggle.classList.add('on');
+      toggle.addEventListener('click', () => {
+        const isOn = toggle.classList.toggle('on');
+        localStorage.setItem('showCrime', isOn ? '1' : '0');
+      });
+    }
+
+    function navigateToSettings(e) {
+      e.preventDefault();
+      feedHTML = document.querySelector('.container').innerHTML;
+      fetch('/' + SLUG + '/settings?partial=1')
+        .then(r => r.text())
+        .then(html => {
+          document.querySelector('.container').innerHTML = html;
+          document.title = 'Settings - ' + SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+          history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
+          initSettingsToggle();
+          document.querySelector('.back').addEventListener('click', navigateBack);
+          window.scrollTo(0, 0);
+        });
+    }
+
+    function navigateBack(e) {
+      e.preventDefault();
+      if (feedHTML) {
+        document.querySelector('.container').innerHTML = feedHTML;
+        document.title = SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+        history.pushState({ page: 'feed' }, '', '/' + SLUG);
+        rebindSettingsLink();
+        filterFeed();
+      } else {
+        location.href = '/' + SLUG;
+      }
+    }
+
+    function rebindSettingsLink() {
+      const link = document.querySelector('.settings-link');
+      if (link) link.addEventListener('click', navigateToSettings);
+    }
+
+    rebindSettingsLink();
+
+    window.addEventListener('popstate', (e) => {
+      if (e.state && e.state.page === 'feed' && feedHTML) {
+        document.querySelector('.container').innerHTML = feedHTML;
+        rebindSettingsLink();
+        filterFeed();
+      } else if (e.state && e.state.page === 'settings') {
+        fetch('/' + SLUG + '/settings?partial=1')
+          .then(r => r.text())
+          .then(html => {
+            document.querySelector('.container').innerHTML = html;
+            initSettingsToggle();
+            document.querySelector('.back').addEventListener('click', navigateBack);
+          });
+      } else {
+        location.reload();
+      }
+    });
   <\/script>
 </body>
 </html>`;
@@ -690,9 +755,29 @@ function getSettingsPage(slug) {
       const isOn = toggle.classList.toggle('on');
       localStorage.setItem('showCrime', isOn ? '1' : '0');
     });
+
+    // Back link uses normal navigation from standalone settings page
   <\/script>
 </body>
 </html>`;
+}
+
+function getSettingsPartial(slug) {
+  const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `
+    <header>
+      <a href="/${slug}" class="back">&larr; ${displayName}</a>
+      <h1>Settings</h1>
+    </header>
+    <div class="settings-list">
+      <div class="settings-row" id="crimeRow">
+        <div class="settings-label">
+          <span class="settings-title">Show crime stories</span>
+          <span class="settings-desc">Include articles about crime, police, and arrests</span>
+        </div>
+        <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
+      </div>
+    </div>`;
 }
 
 function getStyles() {
@@ -709,7 +794,7 @@ function getStyles() {
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     .ios-toggle.on .ios-knob { transform: translateX(22px); }
-    .header-row { display: flex; align-items: center; justify-content: space-between; }
+    .settings-link { margin-left: auto; }
     .settings-link { color: #999; transition: color 0.15s; padding: 4px; }
     .settings-link:hover { color: #333; }
     .settings-list { max-width: 720px; }
@@ -719,7 +804,7 @@ function getStyles() {
     .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; }
     .back:hover { color: #333; }
-    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 12px 0 16px; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab:hover { background: #ddd; }
     .filter-tab.active { background: #333; color: #fff; }
