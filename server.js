@@ -69,36 +69,43 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
   }
 });
 
-// API: QNS
+// API: QNS (RSS feed for accurate timestamps)
 app.get('/api/:neighborhood/qns', async (req, res) => {
   const slug = req.params.neighborhood;
   try {
-    const resp = await fetch(`https://qns.com/neighborhoods/${slug}/`, {
+    const resp = await fetch(`https://qns.com/neighborhoods/${slug}/feed/`, {
       headers: { 'User-Agent': 'local-news-reader/1.0' }
     });
-    const html = await resp.text();
+    const xml = await resp.text();
     const articles = [];
-    const regex = /<article[^>]*>[\s\S]*?<\/article>/gi;
+    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
     let match;
-    while ((match = regex.exec(html)) !== null) {
-      const block = match[0];
-      const titleMatch = block.match(/<h[23][^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
-      const imgMatch = block.match(/<img[^>]*src="([^"]*)"[^>]*/i);
-      const categoryMatch = block.match(/<a[^>]*href="[^"]*\/news\/([^/"]*)\/"[^>]*>([\s\S]*?)<\/a>/i);
-      if (titleMatch) {
-        // Extract date from URL pattern like /2026/02/slug
+    while ((match = itemRegex.exec(xml)) !== null) {
+      const block = match[1];
+      const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/i);
+      const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/i);
+      const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
+      const descMatch = block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/i);
+      const imgMatch = block.match(/<media:content[^>]*url="([^"]*)"[^>]*/i);
+      if (titleMatch && linkMatch) {
         let timestamp = 0;
-        const urlDateMatch = titleMatch[1].match(/\/(\d{4})\/(\d{2})\//);
-        if (urlDateMatch) {
-          const parsed = new Date(`${urlDateMatch[1]}-${urlDateMatch[2]}-15`);
+        if (pubDateMatch) {
+          const parsed = new Date(pubDateMatch[1].trim());
           if (!isNaN(parsed)) timestamp = Math.floor(parsed.getTime() / 1000);
         }
+        let excerpt = '';
+        if (descMatch) {
+          excerpt = descMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
+        }
+        const rawImg = imgMatch ? decodeHtmlEntities(imgMatch[1]) : '';
         articles.push({
-          title: titleMatch[2].replace(/<[^>]*>/g, '').trim(),
-          url: titleMatch[1],
+          title: decodeHtmlEntities(titleMatch[1].trim()),
+          url: linkMatch[1].trim(),
           timestamp,
-          category: categoryMatch ? categoryMatch[2].replace(/<[^>]*>/g, '').trim() : '',
-          image: imgMatch ? upgradeQnsImage(decodeHtmlEntities(imgMatch[1])) : '',
+          category: '',
+          image: rawImg ? upgradeQnsImage(rawImg) : '',
+          excerpt,
         });
       }
     }
@@ -343,8 +350,8 @@ function getNeighborhoodPage(slug) {
             timestamp: a.timestamp || 0,
             source: 'qns',
             meta: '',
-            flair: a.category || '',
-            excerpt: '',
+            flair: '',
+            excerpt: a.excerpt || '',
             image: a.image || '',
           });
         });
