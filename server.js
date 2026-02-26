@@ -12,7 +12,10 @@ function slugToQuery(slug) {
 }
 
 function decodeHtmlEntities(str) {
-  return str.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  return str
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
 // API: Reddit (uses RSS feed — more reliable from servers)
@@ -40,9 +43,17 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
       // Extract thumbnail from media:thumbnail
       const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
       if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
-      // Extract text excerpt from content
+      // Extract text excerpt from content — pull from <div class="md"> and strip Reddit boilerplate
       const decoded = decodeHtmlEntities(content);
-      const excerpt = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      const mdMatch = decoded.match(/<div class="md">([\s\S]*?)<\/div>/);
+      const body = mdMatch ? mdMatch[1] : decoded;
+      const excerpt = body
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/submitted by\s+.*$/i, '')
+        .replace(/\[link\]|\[comments\]/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
       const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
       posts.push({ title, url: link, permalink: link, created, image, excerpt, flair: '' });
     }
