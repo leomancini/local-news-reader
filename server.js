@@ -43,10 +43,6 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
       // Extract thumbnail from media:thumbnail
       const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
       if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
-      // Get higher resolution by bumping width param
-      if (image && (image.includes('preview.redd.it') || image.includes('external-preview.redd.it'))) {
-        image = image.replace(/width=\d+/, 'width=1080');
-      }
       // Extract text excerpt from content — pull from <div class="md"> and strip Reddit boilerplate
       // Double-decode because RSS content is double-encoded (e.g. &amp;#32;)
       const decoded = decodeHtmlEntities(decodeHtmlEntities(content));
