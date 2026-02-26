@@ -541,15 +541,27 @@ function getNeighborhoodPage(slug) {
       });
     }
 
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
     function timeAgo(epoch) {
       if (!epoch) return '';
-      const diff = Date.now() / 1000 - epoch;
+      const now = Date.now();
+      const diff = now / 1000 - epoch;
       if (diff < 0) return '';
       const m = Math.floor(diff / 60);
       if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
       const h = Math.floor(diff / 3600);
       if (h < 8) return h + (h === 1 ? ' hour ago' : ' hours ago');
-      return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const d = new Date(epoch * 1000);
+      const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const today = new Date(now);
+      // "Today" / "Yesterday" / day-of-week within 7 days / full date beyond
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysAgo = Math.floor((startOfToday - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+      if (daysAgo === 0) return 'Today at ' + time;
+      if (daysAgo === 1) return 'Yesterday at ' + time;
+      if (daysAgo < 7) return DAYS[d.getDay()] + ' at ' + time;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + time;
     }
 
     function esc(s) {
