@@ -525,6 +525,17 @@ function getNeighborhoodPage(slug) {
       return d.innerHTML;
     }
 
+    const retina = window.devicePixelRatio > 1 ? '@2x' : '';
+    const tileUrl = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}' + retina + '.png';
+    const mapOpts = { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false };
+    const dotOpts = { radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0 };
+
+    function initMap(id, lat, lng) {
+      const map = L.map(id, mapOpts).setView([lat, lng], 15);
+      L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+      L.circleMarker([lat, lng], dotOpts).addTo(map);
+    }
+
     function renderFeed(items) {
       document.getElementById('loading').remove();
       const ul = document.getElementById('feed');
@@ -533,6 +544,8 @@ function getNeighborhoodPage(slug) {
         ul.innerHTML = '<li class="empty">No articles found</li>';
         return;
       }
+
+      const pending = []; // items with address but no coords yet
 
       items.forEach((item, i) => {
         const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
@@ -547,29 +560,41 @@ function getNeighborhoodPage(slug) {
         const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source] || '';
 
         const mapId = 'map-' + i;
-        const showMap = item.lat && item.lng;
+        const hasCoords = item.lat && item.lng;
+        const hasAddress = !!item.address;
         li.innerHTML =
           (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
           '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-          (showMap ? '<div class="card-map" id="' + mapId + '"></div>' : '');
+          (hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
+           : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
+           : '');
 
         ul.appendChild(li);
 
-        if (showMap) {
-          const map = L.map(mapId, {
-            zoomControl: false, scrollWheelZoom: false, dragging: false,
-            touchZoom: false, doubleClickZoom: false, boxZoom: false,
-            keyboard: false, attributionControl: false,
-          }).setView([item.lat, item.lng], 15);
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.png', {
-            maxZoom: 19,
-          }).addTo(map);
-          L.circleMarker([item.lat, item.lng], {
-            radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0,
-          }).addTo(map);
+        if (hasCoords) {
+          initMap(mapId, item.lat, item.lng);
+        } else if (hasAddress) {
+          pending.push({ mapId, address: item.address });
         }
+      });
+
+      // Lazily geocode uncached addresses and render maps as they resolve
+      pending.forEach(({ mapId, address }) => {
+        fetch('/api/geocode?q=' + encodeURIComponent(address) + '&neighborhood=' + SLUG)
+          .then(r => r.json())
+          .then(geo => {
+            const el = document.getElementById(mapId);
+            if (!el || !geo.lat || !geo.lng) {
+              if (el) el.remove();
+              return;
+            }
+            el.className = 'card-map';
+            el.classList.remove('card-map-placeholder');
+            initMap(mapId, geo.lat, geo.lng);
+          })
+          .catch(() => { const el = document.getElementById(mapId); if (el) el.remove(); });
       });
     }
 
@@ -615,6 +640,8 @@ function getStyles() {
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
     .card-map { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; overflow: hidden; }
     .card-map .leaflet-container { border-radius: 0 0 20px 20px; }
+    .card-map-placeholder { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; background: #eee; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     form { display: flex; gap: 8px; margin: 16px 0; }
     form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
