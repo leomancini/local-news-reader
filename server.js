@@ -658,7 +658,7 @@ function getNeighborhoodPage(slug) {
     }
 
     const DISPLAY = SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
-    const settingsHTML = '<header><a href="/' + SLUG + '" class="back">&larr; ' + DISPLAY + '</a><h1>Settings</h1></header><div class="settings-list"><div class="settings-row" id="crimeRow"><div class="settings-label"><span class="settings-title">Show crime stories</span><span class="settings-desc">Include articles about crime, police, and arrests</span></div><div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div></div></div>';
+    const settingsHTML = '<header><button class="back">&larr; ' + DISPLAY + '</button><h1>Settings</h1></header><div class="settings-list"><div class="settings-row" id="crimeRow"><div class="settings-label"><span class="settings-title">Show crime stories</span><span class="settings-desc">Include articles about crime, police, and arrests</span></div><div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div></div></div>';
 
     function showSettings() {
       feedHTML = document.querySelector('.container').innerHTML;
@@ -799,7 +799,8 @@ function getStyles() {
     .settings-label { flex: 1; margin-right: 16px; }
     .settings-title { display: block; font-size: 16px; font-weight: 500; color: #333; }
     .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
-    .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; }
+    .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+    .back:active { color: #666; }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab.active { background: #333; color: #fff; }
