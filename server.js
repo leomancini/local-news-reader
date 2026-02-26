@@ -358,9 +358,9 @@ function getNeighborhoodPage(slug) {
         li.innerHTML =
           (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
+          (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
           '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-          (item.flair ? '<span class="flair">' + esc(item.flair) + '</span>' : '') +
-          (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '');
+          (item.flair ? '<span class="flair">' + esc(item.flair) + '</span>' : '');
 
         ul.appendChild(li);
       });
