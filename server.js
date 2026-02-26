@@ -665,7 +665,6 @@ function getNeighborhoodPage(slug) {
       document.querySelector('.container').innerHTML = settingsHTML;
       document.title = 'Settings - ' + DISPLAY;
       initSettingsToggle();
-      document.querySelector('.back').addEventListener('click', showFeed);
       window.scrollTo(0, 0);
     }
 
@@ -673,38 +672,31 @@ function getNeighborhoodPage(slug) {
       if (feedHTML) {
         document.querySelector('.container').innerHTML = feedHTML;
         document.title = DISPLAY;
-        rebindSettingsLink();
         filterFeed();
       } else {
         location.href = '/' + SLUG;
       }
     }
 
-    let settingsNav = false;
-    function navigateToSettings(e) {
-      e.preventDefault();
-      if (settingsNav) return;
-      settingsNav = true;
-      showSettings();
-      history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
-      setTimeout(() => { settingsNav = false; }, 100);
-    }
-
-    function navigateBack(e) {
-      e.preventDefault();
-      showFeed();
-      history.pushState({ page: 'feed' }, '', '/' + SLUG);
-    }
-
-    function rebindSettingsLink() {
-      const link = document.querySelector('.settings-link');
-      if (link) {
-        link.addEventListener('touchstart', navigateToSettings, { passive: false });
-        link.addEventListener('click', navigateToSettings);
+    let navLock = false;
+    document.querySelector('.container').addEventListener('click', (e) => {
+      if (navLock) return;
+      const settings = e.target.closest('.settings-link');
+      const back = e.target.closest('.back');
+      if (settings) {
+        e.preventDefault();
+        navLock = true;
+        showSettings();
+        history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
+        setTimeout(() => { navLock = false; }, 100);
+      } else if (back) {
+        e.preventDefault();
+        navLock = true;
+        showFeed();
+        history.pushState({ page: 'feed' }, '', '/' + SLUG);
+        setTimeout(() => { navLock = false; }, 100);
       }
-    }
-
-    rebindSettingsLink();
+    });
 
     window.addEventListener('popstate', (e) => {
       if (e.state && e.state.page === 'feed') {
