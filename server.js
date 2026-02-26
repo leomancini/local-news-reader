@@ -390,7 +390,7 @@ function getStyles() {
     .meta { font-size: 12px; color: #888; margin-top: 2px; display: block; }
     .flair { display: inline-block; font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 6px; border-radius: 4px; margin-top: 4px; }
     .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
-    .thumb { width: 100%; max-height: 140px; object-fit: cover; border-radius: 4px; margin-bottom: 6px; }
+    .thumb { width: calc(100% + 28px); margin: -14px -14px 10px -14px; max-height: 300px; object-fit: cover; border-radius: 8px 8px 0 0; display: block; }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     form { display: flex; gap: 8px; margin: 16px 0; }
     form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
