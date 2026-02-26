@@ -377,15 +377,14 @@ function getStyles() {
     .sources { font-size: 13px; color: #888; }
     .sources a { color: #1a73e8; text-decoration: none; margin-left: 8px; }
     .sources a:hover { text-decoration: underline; }
-    .feed-container { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 720px; }
+    .feed-container { max-width: 720px; }
     .source-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
     .source-reddit { background: #ff45001a; color: #ff4500; }
     .source-qns { background: #0a66c21a; color: #0a66c2; }
     .source-yimby { background: #2e7d321a; color: #2e7d32; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
-    .post-list { list-style: none; }
-    .post-item { padding: 10px 0; border-bottom: 1px solid #eee; }
-    .post-item:last-child { border-bottom: none; }
+    .post-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .post-item { padding: 14px; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .post-title { color: #1a73e8; text-decoration: none; font-size: 14px; font-weight: 500; display: block; }
     .post-title:hover { text-decoration: underline; }
     .meta { font-size: 12px; color: #888; margin-top: 2px; display: block; }
