@@ -51,9 +51,10 @@ function normalizeStreetName(addr) {
 const geocodeCache = new Map();
 let lastGeocode = 0;
 
-async function geocodeAddress(address) {
+async function geocodeAddress(address, viewbox) {
   if (!address) return null;
-  if (geocodeCache.has(address)) return geocodeCache.get(address);
+  const cacheKey = viewbox ? address + '|vb' : address;
+  if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey);
 
   // Rate limit: 1 req/sec for Nominatim
   const now = Date.now();
@@ -63,17 +64,19 @@ async function geocodeAddress(address) {
 
   try {
     const q = encodeURIComponent(address);
-    const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3`, {
+    let url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3`;
+    if (viewbox) url += `&viewbox=${viewbox}&bounded=1`;
+    const resp = await fetch(url, {
       headers: { 'User-Agent': 'local-news-reader/1.0 (neighborhood news aggregator)' }
     });
     const data = await resp.json();
     // Prefer house/road results, skip area-level matches (quarter, city, etc.)
     const hit = data.find(d => ['house', 'residential', 'tertiary', 'secondary', 'primary', 'road', 'building'].includes(d.type) || d.class === 'building') || data[0];
     const result = hit ? { lat: parseFloat(hit.lat), lng: parseFloat(hit.lon) } : null;
-    geocodeCache.set(address, result);
+    geocodeCache.set(cacheKey, result);
     return result;
   } catch {
-    geocodeCache.set(address, null);
+    geocodeCache.set(cacheKey, null);
     return null;
   }
 }
@@ -257,6 +260,23 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
 });
 
 // API: Geocode (cached, rate-limited Nominatim proxy)
+const neighborhoodCenter = new Map(); // cache neighborhood center coords for viewbox
+
+async function getNeighborhoodViewbox(neighborhood) {
+  if (!neighborhood) return null;
+  if (neighborhoodCenter.has(neighborhood)) return neighborhoodCenter.get(neighborhood);
+  const center = await geocodeAddress(`${neighborhood}, Queens, New York, NY`);
+  if (center) {
+    // ~2km bounding box around the neighborhood center
+    const d = 0.015;
+    const vb = `${center.lng - d},${center.lat - d},${center.lng + d},${center.lat + d}`;
+    neighborhoodCenter.set(neighborhood, vb);
+    return vb;
+  }
+  neighborhoodCenter.set(neighborhood, null);
+  return null;
+}
+
 app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   const neighborhood = (req.query.neighborhood || '').replace(/-/g, ' ').trim();
@@ -268,11 +288,12 @@ app.get('/api/geocode', async (req, res) => {
   const normalized = normalizeStreetName(baseAddr);
   const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, Queens, New York, NY` : normalized;
   let result = await geocodeAddress(fullQuery);
-  // Fallback: strip house number and try street + Queens (no neighborhood to avoid matching the area itself)
+  // Fallback: strip house number and try street + viewbox bounded to neighborhood
   if (!result) {
     const streetOnly = normalized.replace(/^\d+[-–]?\d*\s+/, '');
     if (streetOnly !== normalized) {
-      result = await geocodeAddress(`${streetOnly}, Queens, NY`);
+      const viewbox = await getNeighborhoodViewbox(neighborhood);
+      result = await geocodeAddress(`${streetOnly}, Queens, NY`, viewbox);
     }
   }
   res.json(result || { lat: null, lng: null });
