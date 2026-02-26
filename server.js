@@ -98,7 +98,7 @@ app.get('/api/:neighborhood/qns', async (req, res) => {
           url: titleMatch[1],
           timestamp,
           category: categoryMatch ? categoryMatch[2].replace(/<[^>]*>/g, '').trim() : '',
-          image: imgMatch ? decodeHtmlEntities(imgMatch[1]) : '',
+          image: imgMatch ? upgradeQnsImage(decodeHtmlEntities(imgMatch[1])) : '',
         });
       }
     }
@@ -107,6 +107,21 @@ app.get('/api/:neighborhood/qns', async (req, res) => {
     res.status(500).json({ error: e.message, articles: [] });
   }
 });
+
+function upgradeQnsImage(url) {
+  try {
+    const u = new URL(url);
+    u.searchParams.set('w', '900');
+    u.searchParams.set('quality', '80');
+    u.searchParams.delete('resize');
+    return u.toString();
+  } catch { return url; }
+}
+
+function upgradeYimbyImage(url) {
+  // Strip WordPress -WxH suffix: image-260x148.jpg → image.jpg
+  return url.replace(/-\d+x\d+(\.\w+)$/, '$1');
+}
 
 // API: YIMBY
 app.get('/api/:neighborhood/yimby', async (req, res) => {
@@ -143,7 +158,7 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
           url: titleMatch[1],
           date: rawDate,
           timestamp,
-          image: imgMatch ? imgMatch[1] : '',
+          image: imgMatch ? upgradeYimbyImage(imgMatch[1]) : '',
         });
       }
     }
@@ -381,8 +396,7 @@ function getNeighborhoodPage(slug) {
           (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
-          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-          (item.flair ? '<span class="flair">' + esc(item.flair) + '</span>' : '');
+          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>';
 
         ul.appendChild(li);
       });
@@ -425,7 +439,7 @@ function getStyles() {
     .post-title { color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
     .post-title:hover { text-decoration: underline; }
     .meta { font-size: 12px; color: #888; margin-top: 6px; display: block; }
-    .flair { display: inline-block; font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 6px; border-radius: 4px; margin-top: 4px; }
+
     .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
