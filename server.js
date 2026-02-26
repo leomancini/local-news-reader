@@ -250,7 +250,7 @@ app.get('/api/geocode', async (req, res) => {
   const neighborhood = (req.query.neighborhood || '').replace(/-/g, ' ').trim();
   if (!q) return res.json({ lat: null, lng: null });
   const normalized = normalizeStreetName(q);
-  const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, New York` : normalized;
+  const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, Queens, New York, NY` : normalized;
   const result = await geocodeAddress(fullQuery);
   res.json(result || { lat: null, lng: null });
 });
