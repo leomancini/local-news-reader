@@ -493,9 +493,9 @@ function getNeighborhoodPage(slug) {
         <button class="filter-tab" data-source="reddit">Reddit</button>
         <button class="filter-tab" data-source="qns">QNS</button>
         <button class="filter-tab" data-source="yimby">YIMBY</button>
-        <a href="/${slug}/settings" class="settings-link" aria-label="Settings">
+        <button class="settings-link" aria-label="Settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </a>
+        </button>
       </div>
     </header>
 
@@ -793,8 +793,7 @@ function getStyles() {
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     .ios-toggle.on .ios-knob { transform: translateX(22px); }
-    .settings-link { margin-left: auto; }
-    .settings-link { color: #999; transition: color 0.15s; padding: 4px; }
+    .settings-link { margin-left: auto; color: #999; transition: color 0.15s; padding: 4px; background: none; border: none; cursor: pointer; }
     .settings-list { max-width: 720px; }
     .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
     .settings-label { flex: 1; margin-right: 16px; }
