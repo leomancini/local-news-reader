@@ -11,6 +11,42 @@ function slugToQuery(slug) {
   return slug.replace(/-/g, ' ');
 }
 
+// Address extraction for map pins
+function extractAddress(text) {
+  if (!text) return '';
+  const m = text.match(/\d+[-–]?\d*\s+(?:[NSEW]\.\s+)?(?:[\dA-Za-z][\w]*[.\s]*)+?(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?)\b/i);
+  return m ? m[0].trim() : '';
+}
+
+// Geocoding with in-memory cache + rate limiting
+const geocodeCache = new Map();
+let lastGeocode = 0;
+
+async function geocodeAddress(address) {
+  if (!address) return null;
+  if (geocodeCache.has(address)) return geocodeCache.get(address);
+
+  // Rate limit: 1 req/sec for Nominatim
+  const now = Date.now();
+  const wait = Math.max(0, 1100 - (now - lastGeocode));
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastGeocode = Date.now();
+
+  try {
+    const q = encodeURIComponent(address + ', New York, NY');
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+      headers: { 'User-Agent': 'local-news-reader/1.0 (neighborhood news aggregator)' }
+    });
+    const data = await resp.json();
+    const result = data.length ? { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) } : null;
+    geocodeCache.set(address, result);
+    return result;
+  } catch {
+    geocodeCache.set(address, null);
+    return null;
+  }
+}
+
 function decodeHtmlEntities(str) {
   return str
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
@@ -61,7 +97,8 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
         .trim()
         .slice(0, 200);
       const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
-      posts.push({ title, url: link, permalink: link, created, image, excerpt, flair: '' });
+      const address = extractAddress(title) || extractAddress(excerpt);
+      posts.push({ title, url: link, permalink: link, created, image, excerpt, flair: '', address });
     }
     res.json({ posts, subreddit: sub });
   } catch (e) {
@@ -99,13 +136,16 @@ app.get('/api/:neighborhood/qns', async (req, res) => {
           if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
         }
         const rawImg = imgMatch ? decodeHtmlEntities(imgMatch[1]) : '';
+        const t = decodeHtmlEntities(titleMatch[1].trim());
+        const address = extractAddress(t) || extractAddress(excerpt);
         articles.push({
-          title: decodeHtmlEntities(titleMatch[1].trim()),
+          title: t,
           url: linkMatch[1].trim(),
           timestamp,
           category: '',
           image: rawImg ? upgradeQnsImage(rawImg) : '',
           excerpt,
+          address,
         });
       }
     }
@@ -166,13 +206,16 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
           excerpt = excerptMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
           if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
         }
+        const t = titleMatch[2].replace(/<[^>]*>/g, '').trim();
+        const address = extractAddress(t) || extractAddress(excerpt);
         articles.push({
-          title: titleMatch[2].replace(/<[^>]*>/g, '').trim(),
+          title: t,
           url: titleMatch[1],
           date: rawDate,
           timestamp,
           image: imgMatch ? upgradeYimbyImage(imgMatch[1]) : '',
           excerpt,
+          address,
         });
       }
     }
@@ -180,6 +223,14 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message, articles: [] });
   }
+});
+
+// API: Geocode (cached, rate-limited Nominatim proxy)
+app.get('/api/geocode', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json({ lat: null, lng: null });
+  const result = await geocodeAddress(q);
+  res.json(result || { lat: null, lng: null });
 });
 
 // Home page
@@ -240,6 +291,8 @@ function getNeighborhoodPage(slug) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${displayName} - Local News</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>${getStyles()}</style>
 </head>
 <body>
@@ -340,6 +393,7 @@ function getNeighborhoodPage(slug) {
             flair: p.flair || '',
             excerpt: p.excerpt || '',
             image: p.image || '',
+            address: p.address || '',
           });
         });
       }
@@ -355,6 +409,7 @@ function getNeighborhoodPage(slug) {
             flair: '',
             excerpt: a.excerpt || '',
             image: a.image || '',
+            address: a.address || '',
           });
         });
       }
@@ -370,6 +425,7 @@ function getNeighborhoodPage(slug) {
             flair: '',
             excerpt: a.excerpt || '',
             image: a.image || '',
+            address: a.address || '',
           });
         });
       }
@@ -389,7 +445,9 @@ function getNeighborhoodPage(slug) {
         return;
       }
 
-      items.forEach(item => {
+      const mapTargets = [];
+
+      items.forEach((item, i) => {
         const crime = isCrime(item.title + ' ' + item.flair + ' ' + item.excerpt);
         const li = document.createElement('li');
         li.className = 'post-item';
@@ -401,13 +459,47 @@ function getNeighborhoodPage(slug) {
         const date = item.timestamp ? timeAgo(item.timestamp) : '';
         const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source];
 
+        const mapId = 'map-' + i;
         li.innerHTML =
           (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
-          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>';
+          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
+          (item.address ? '<div class="card-map" id="' + mapId + '"></div>' : '');
 
         ul.appendChild(li);
+        if (item.address) mapTargets.push({ id: mapId, address: item.address });
+      });
+
+      // Geocode addresses and init maps
+      mapTargets.forEach(t => {
+        fetch('/api/geocode?q=' + encodeURIComponent(t.address))
+          .then(r => r.json())
+          .then(geo => {
+            if (!geo.lat || !geo.lng) {
+              const el = document.getElementById(t.id);
+              if (el) el.remove();
+              return;
+            }
+            const map = L.map(t.id, {
+              zoomControl: false,
+              scrollWheelZoom: false,
+              dragging: false,
+              touchZoom: false,
+              doubleClickZoom: false,
+              boxZoom: false,
+              keyboard: false,
+              attributionControl: false,
+            }).setView([geo.lat, geo.lng], 16);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.png', {
+              maxZoom: 19,
+            }).addTo(map);
+            L.marker([geo.lat, geo.lng]).addTo(map);
+          })
+          .catch(() => {
+            const el = document.getElementById(t.id);
+            if (el) el.remove();
+          });
       });
     }
 
@@ -449,6 +541,8 @@ function getStyles() {
 
     .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
+    .card-map { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; overflow: hidden; }
+    .card-map .leaflet-container { border-radius: 0 0 20px 20px; }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     form { display: flex; gap: 8px; margin: 16px 0; }
     form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
