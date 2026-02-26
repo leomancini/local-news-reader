@@ -31,7 +31,7 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
     let match;
     while ((match = entryRegex.exec(xml)) !== null) {
       const entry = match[0];
-      const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '';
+      const title = decodeHtmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '');
       const link = entry.match(/<link[^>]*href="([^"]*)"[^>]*\/>/)?.[1] || '';
       const updated = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1] || '';
       const content = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || '';
