@@ -44,7 +44,8 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
       const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
       if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
       // Extract text excerpt from content — pull from <div class="md"> and strip Reddit boilerplate
-      const decoded = decodeHtmlEntities(content);
+      // Double-decode because RSS content is double-encoded (e.g. &amp;#32;)
+      const decoded = decodeHtmlEntities(decodeHtmlEntities(content));
       const mdMatch = decoded.match(/<div class="md">([\s\S]*?)<\/div>/);
       const body = mdMatch ? mdMatch[1] : decoded;
       const excerpt = body
