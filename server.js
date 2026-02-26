@@ -147,6 +147,7 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
       const dateMatch = block.match(/<time[^>]*datetime="([^"]*)"[^>]*>([\s\S]*?)<\/time>/i)
         || block.match(/<span[^>]*date[^>]*>([\s\S]*?)<\/span>/i);
       const imgMatch = block.match(/<img[^>]*src="([^"]*)"[^>]*/i);
+      const excerptMatch = block.match(/<div class="content-list-excerpt"[^>]*>([\s\S]*?)<\/div>/i);
       if (titleMatch) {
         const rawDate = dateMatch ? (dateMatch[2] || dateMatch[1]).replace(/<[^>]*>/g, '').trim() : '';
         let timestamp = 0;
@@ -160,12 +161,18 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
           const parsed = new Date(cleaned);
           if (!isNaN(parsed)) timestamp = Math.floor(parsed.getTime() / 1000);
         }
+        let excerpt = '';
+        if (excerptMatch) {
+          excerpt = excerptMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
+        }
         articles.push({
           title: titleMatch[2].replace(/<[^>]*>/g, '').trim(),
           url: titleMatch[1],
           date: rawDate,
           timestamp,
           image: imgMatch ? upgradeYimbyImage(imgMatch[1]) : '',
+          excerpt,
         });
       }
     }
@@ -366,7 +373,7 @@ function getNeighborhoodPage(slug) {
             source: 'yimby',
             meta: a.date || '',
             flair: '',
-            excerpt: '',
+            excerpt: a.excerpt || '',
             image: a.image || '',
           });
         });
