@@ -12,15 +12,25 @@ function slugToQuery(slug) {
 }
 
 // Address extraction for map pins
-const STREET_SUFFIXES = /(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?)(?:\s|,|$)/i;
+const STREET_SUFFIX = '(?:Street|St\\.?|Avenue|Ave\\.?|Boulevard|Blvd\\.?|Place|Pl\\.?|Road|Rd\\.?|Drive|Dr\\.?|Way|Court|Ct\\.?|Lane|Ln\\.?|Plaza|Broadway|Parkway|Pkwy\\.?)';
+const STREET_SUFFIXES = new RegExp(STREET_SUFFIX + '(?:\\s|,|$)', 'i');
+// Intersection pattern: "41st Ave and 26th St" or "Vernon and 47th Rd"
+const INTERSECTION_RE = new RegExp('(\\d+\\w*\\s+' + STREET_SUFFIX + ')\\s+(?:and|&|at)\\s+(\\d+\\w*\\s+' + STREET_SUFFIX + ')', 'i');
+// Also match "StreetName and NNth St" like "Vernon and 47th Rd"
+const INTERSECTION_RE2 = new RegExp('([A-Z][a-z]+)\\s+(?:and|&)\\s+(\\d+\\w*\\s+' + STREET_SUFFIX + ')', 'i');
 
 function extractAddress(text) {
   if (!text) return '';
-  // Find a street suffix, then look backwards for the house number
+  // Try intersection first (e.g. "41st ave and 26th st")
+  const ix = INTERSECTION_RE.exec(text);
+  if (ix) return (ix[1] + ' and ' + ix[2]).trim();
+  const ix2 = INTERSECTION_RE2.exec(text);
+  if (ix2) return (ix2[1] + ' and ' + ix2[2]).trim();
+  // Then try standard address with house number
   const suffixMatch = STREET_SUFFIXES.exec(text);
   if (!suffixMatch) return '';
   const before = text.substring(0, suffixMatch.index + suffixMatch[0].length);
-  const m = before.match(/(\d+[-–]?\d*\s+(?:[NSEW]\.\s+)?(?:[\w]+\s+){0,4}(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?))/i);
+  const m = before.match(new RegExp('(\\d+[-–]?\\d*\\s+(?:[NSEW]\\.\\s+)?(?:[\\w]+\\s+){0,4}' + STREET_SUFFIX + ')', 'i'));
   return m ? m[1].trim() : '';
 }
 
@@ -251,7 +261,11 @@ app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   const neighborhood = (req.query.neighborhood || '').replace(/-/g, ' ').trim();
   if (!q) return res.json({ lat: null, lng: null });
-  const normalized = normalizeStreetName(q);
+
+  // For intersections like "41st Ave and 26th St", use the first street
+  const isIntersection = /\band\b/i.test(q);
+  const baseAddr = isIntersection ? q.split(/\band\b/i)[0].trim() : q;
+  const normalized = normalizeStreetName(baseAddr);
   const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, Queens, New York, NY` : normalized;
   let result = await geocodeAddress(fullQuery);
   // Fallback: strip house number and try street + Queens (no neighborhood to avoid matching the area itself)
@@ -521,11 +535,13 @@ function getNeighborhoodPage(slug) {
               boxZoom: false,
               keyboard: false,
               attributionControl: false,
-            }).setView([geo.lat, geo.lng], 16);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.png', {
+            }).setView([geo.lat, geo.lng], 15);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.png', {
               maxZoom: 19,
             }).addTo(map);
-            L.marker([geo.lat, geo.lng]).addTo(map);
+            L.circleMarker([geo.lat, geo.lng], {
+              radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0,
+            }).addTo(map);
           })
           .catch(() => {
             const el = document.getElementById(t.id);
