@@ -15,10 +15,17 @@ function slugToQuery(slug) {
 app.get('/api/:neighborhood/reddit', async (req, res) => {
   const sub = slugToSubreddit(req.params.neighborhood);
   try {
-    const resp = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=25`, {
-      headers: { 'User-Agent': 'local-news-reader/1.0' }
+    const resp = await fetch(`https://old.reddit.com/r/${sub}/hot.json?limit=25`, {
+      headers: { 'User-Agent': 'web:local-news-reader:v1.0 (by /u/local-news-aggregator)' }
     });
-    const data = await resp.json();
+    const text = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error('Reddit returned non-JSON:', text.slice(0, 200));
+      return res.json({ posts: [], subreddit: sub, error: 'Reddit blocked request' });
+    }
     const posts = (data?.data?.children || []).map(c => {
       let image = '';
       const thumb = c.data.thumbnail;
