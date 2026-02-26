@@ -11,39 +11,34 @@ function slugToQuery(slug) {
   return slug.replace(/-/g, ' ');
 }
 
-// API: Reddit
+// API: Reddit (uses RSS feed — more reliable from servers)
 app.get('/api/:neighborhood/reddit', async (req, res) => {
   const sub = slugToSubreddit(req.params.neighborhood);
   try {
-    const resp = await fetch(`https://old.reddit.com/r/${sub}/hot.json?limit=25`, {
+    const resp = await fetch(`https://www.reddit.com/r/${sub}/.rss`, {
       headers: { 'User-Agent': 'web:local-news-reader:v1.0 (by /u/local-news-aggregator)' }
     });
-    const text = await resp.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      console.error('Reddit returned non-JSON:', text.slice(0, 200));
-      return res.json({ posts: [], subreddit: sub, error: 'Reddit blocked request' });
-    }
-    const posts = (data?.data?.children || []).map(c => {
+    const xml = await resp.text();
+    const posts = [];
+    const entryRegex = /<entry>[\s\S]*?<\/entry>/gi;
+    let match;
+    while ((match = entryRegex.exec(xml)) !== null) {
+      const entry = match[0];
+      const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '';
+      const link = entry.match(/<link[^>]*href="([^"]*)"[^>]*\/>/)?.[1] || '';
+      const updated = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1] || '';
+      const content = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || '';
+      // Extract image from content (HTML encoded in RSS)
       let image = '';
-      const thumb = c.data.thumbnail;
-      if (thumb && thumb.startsWith('http')) image = thumb;
-      if (c.data.preview?.images?.[0]?.source?.url) {
-        image = c.data.preview.images[0].source.url.replace(/&amp;/g, '&');
-      }
-      return {
-        title: c.data.title,
-        url: c.data.url,
-        permalink: `https://www.reddit.com${c.data.permalink}`,
-        score: c.data.score,
-        num_comments: c.data.num_comments,
-        created: c.data.created_utc,
-        flair: c.data.link_flair_text || '',
-        image,
-      };
-    });
+      const imgMatch = content.match(/&lt;img\s[^&]*src=&quot;([^&]*)&quot;/i)
+        || content.match(/<img[^>]*src="([^"]*)"[^>]*/i);
+      if (imgMatch) image = imgMatch[1];
+      // Extract thumbnail from media:thumbnail
+      const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
+      if (thumbMatch) image = thumbMatch[1];
+      const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
+      posts.push({ title, url: link, permalink: link, created, image, score: 0, num_comments: 0, flair: '' });
+    }
     res.json({ posts, subreddit: sub });
   } catch (e) {
     res.status(500).json({ error: e.message, posts: [] });
