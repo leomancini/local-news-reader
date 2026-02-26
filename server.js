@@ -393,7 +393,7 @@ function getStyles() {
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
     .post-item { padding: 16px; background: #fff; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    .post-title { color: #1a73e8; text-decoration: none; font-size: 14px; font-weight: 500; display: block; }
+    .post-title { color: #333; text-decoration: none; font-size: 14px; font-weight: 500; display: block; }
     .post-title:hover { text-decoration: underline; }
     .meta { font-size: 12px; color: #888; margin-top: 6px; display: block; }
     .flair { display: inline-block; font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 6px; border-radius: 4px; margin-top: 4px; }
