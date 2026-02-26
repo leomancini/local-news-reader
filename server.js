@@ -24,6 +24,19 @@ function extractAddress(text) {
   return m ? m[1].trim() : '';
 }
 
+// Normalize spelled-out street numbers for geocoding (e.g. "Second Street" → "2nd Street")
+const ORDINALS = {
+  'first':'1st','second':'2nd','third':'3rd','fourth':'4th','fifth':'5th',
+  'sixth':'6th','seventh':'7th','eighth':'8th','ninth':'9th','tenth':'10th',
+  'eleventh':'11th','twelfth':'12th','thirteenth':'13th','fourteenth':'14th',
+  'fifteenth':'15th','sixteenth':'16th','seventeenth':'17th','eighteenth':'18th',
+  'nineteenth':'19th','twentieth':'20th',
+};
+function normalizeStreetName(addr) {
+  return addr.replace(/\b([A-Za-z]+)\b(?=\s+(?:Street|St|Avenue|Ave|Place|Pl|Road|Rd|Drive|Dr|Boulevard|Blvd))/i,
+    (_, w) => ORDINALS[w.toLowerCase()] || w);
+}
+
 // Geocoding with in-memory cache + rate limiting
 const geocodeCache = new Map();
 let lastGeocode = 0;
@@ -236,7 +249,8 @@ app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   const neighborhood = (req.query.neighborhood || '').replace(/-/g, ' ').trim();
   if (!q) return res.json({ lat: null, lng: null });
-  const fullQuery = neighborhood ? `${q}, ${neighborhood}, New York` : q;
+  const normalized = normalizeStreetName(q);
+  const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, New York` : normalized;
   const result = await geocodeAddress(fullQuery);
   res.json(result || { lat: null, lng: null });
 });
