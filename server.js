@@ -438,31 +438,26 @@ function getHomePage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local News Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
   <style>${getStyles()}</style>
 </head>
 <body>
   <div class="container">
     <h1>Local News Reader</h1>
-    <p>Enter a neighborhood to see aggregated local news.</p>
-    <form onsubmit="go(event)">
-      <input type="text" id="hood" placeholder="e.g. long-island-city" autofocus>
-      <button type="submit">Go</button>
-    </form>
-    <div class="examples">
-      <p>Try:</p>
+    <p>Queens neighborhood news from Reddit, QNS, and YIMBY.</p>
+    <div class="hood-grid">
       <a href="/long-island-city">Long Island City</a>
       <a href="/astoria">Astoria</a>
-      <a href="/williamsburg">Williamsburg</a>
-      <a href="/bushwick">Bushwick</a>
+      <a href="/jackson-heights">Jackson Heights</a>
+      <a href="/flushing">Flushing</a>
+      <a href="/sunnyside">Sunnyside</a>
+      <a href="/forest-hills">Forest Hills</a>
+      <a href="/ridgewood">Ridgewood</a>
+      <a href="/jamaica">Jamaica</a>
     </div>
   </div>
-  <script>
-    function go(e) {
-      e.preventDefault();
-      const v = document.getElementById('hood').value.trim().toLowerCase().replace(/\\s+/g, '-');
-      if (v) window.location.href = '/' + v;
-    }
-  </script>
 </body>
 </html>`;
 }
@@ -476,6 +471,9 @@ function getNeighborhoodPage(slug) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${displayName} - Local News</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
   <style>${getStyles()}</style>
@@ -483,21 +481,13 @@ function getNeighborhoodPage(slug) {
 <body>
   <div class="container">
     <header>
-      <a href="/" class="back">&larr; Home</a>
       <h1>${displayName}</h1>
       <div class="filter-tabs">
         <button class="filter-tab active" data-source="all">All</button>
         <button class="filter-tab" data-source="reddit">Reddit</button>
         <button class="filter-tab" data-source="qns">QNS</button>
         <button class="filter-tab" data-source="yimby">YIMBY</button>
-      </div>
-      <div class="controls-row">
-        <div class="crime-toggle">
-          <label>
-            <input type="checkbox" id="crimeToggle">
-            Include crime news
-          </label>
-        </div>
+        <button class="filter-tab crime-btn" id="crimeToggle">Crime</button>
       </div>
     </header>
 
@@ -516,13 +506,14 @@ function getNeighborhoodPage(slug) {
       return CRIME_KEYWORDS.some(k => lower.includes(k));
     }
 
-    function showCrime() {
-      return document.getElementById('crimeToggle').checked;
-    }
+    let crimeOn = false;
+
+    function showCrime() { return crimeOn; }
 
     let activeSource = 'all';
 
     document.querySelectorAll('.filter-tab').forEach(tab => {
+      if (tab.classList.contains('crime-btn')) return;
       tab.addEventListener('click', () => {
         document.querySelector('.filter-tab.active').classList.remove('active');
         tab.classList.add('active');
@@ -531,7 +522,11 @@ function getNeighborhoodPage(slug) {
       });
     });
 
-    document.getElementById('crimeToggle').addEventListener('change', filterFeed);
+    document.getElementById('crimeToggle').addEventListener('click', () => {
+      crimeOn = !crimeOn;
+      document.getElementById('crimeToggle').classList.toggle('crime-on', crimeOn);
+      filterFeed();
+    });
 
     function filterFeed() {
       document.querySelectorAll('.post-item').forEach(el => {
@@ -657,45 +652,40 @@ function getNeighborhoodPage(slug) {
 function getStyles() {
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
     header { margin-bottom: 24px; }
     .back { color: #666; text-decoration: none; font-size: 14px; }
     .back:hover { color: #333; }
-    h1 { font-size: 28px; margin: 8px 0 12px; }
+    h1 { font-family: 'Lora', Georgia, serif; font-size: 32px; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
     h2 a:hover { text-decoration: underline; }
-    .crime-toggle { margin-bottom: 8px; }
-    .crime-toggle label { font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .crime-btn { margin-left: auto; }
+    .crime-btn.crime-on { background: #333; color: #fff; }
     .filter-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-size: 14px; cursor: pointer; transition: all 0.15s; }
     .filter-tab:hover { background: #ddd; }
     .filter-tab.active { background: #333; color: #fff; }
-    .controls-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+    .filter-tabs { flex-wrap: wrap; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { max-width: 720px; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
     .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    .post-title { color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
+    .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 600; display: block; line-height: 1.3; }
     .post-title:hover { text-decoration: underline; }
-    .meta { font-size: 12px; color: #888; margin-top: 6px; display: block; }
-    .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
-    .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
+    .meta { font-size: 13px; color: #888; margin-top: 6px; display: block; }
+    .excerpt { font-size: 14px; color: #666; margin-top: 4px; line-height: 1.5; }
+    .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; height: 200px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; background: #eee; }
     .card-map { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; overflow: hidden; }
     .card-map .leaflet-container { border-radius: 0 0 20px 20px; }
     .card-map-placeholder { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; background: #eee; animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
-    form { display: flex; gap: 8px; margin: 16px 0; }
-    form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
-    form button { padding: 10px 20px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
-    form button:hover { background: #1557b0; }
-    .examples { margin-top: 16px; }
-    .examples p { font-size: 14px; color: #888; margin-bottom: 8px; }
-    .examples a { display: inline-block; margin-right: 12px; color: #1a73e8; text-decoration: none; font-size: 14px; }
-    .examples a:hover { text-decoration: underline; }
+    .hood-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+    .hood-grid a { display: block; padding: 14px 16px; background: #fff; border-radius: 12px; color: #333; text-decoration: none; font-size: 15px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.15s; }
+    .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
   `;
 }
 
