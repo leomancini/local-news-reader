@@ -395,13 +395,13 @@ function getStyles() {
     .feed-container { max-width: 720px; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-    .post-item { padding: 14px; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .post-item { padding: 16px; background: #fff; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
     .post-title { color: #1a73e8; text-decoration: none; font-size: 14px; font-weight: 500; display: block; }
     .post-title:hover { text-decoration: underline; }
     .meta { font-size: 12px; color: #888; margin-top: 2px; display: block; }
     .flair { display: inline-block; font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 6px; border-radius: 4px; margin-top: 4px; }
     .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
-    .thumb { width: calc(100% + 28px); margin: -14px -14px 10px -14px; max-height: 300px; object-fit: cover; border-radius: 8px 8px 0 0; display: block; }
+    .thumb { width: calc(100% + 32px); margin: -16px -16px 10px -16px; max-height: 300px; object-fit: cover; border-radius: 14px 14px 0 0; display: block; }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     form { display: flex; gap: 8px; margin: 16px 0; }
     form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
