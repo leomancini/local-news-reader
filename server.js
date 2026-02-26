@@ -11,6 +11,10 @@ function slugToQuery(slug) {
   return slug.replace(/-/g, ' ');
 }
 
+function decodeHtmlEntities(str) {
+  return str.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+
 // API: Reddit (uses RSS feed — more reliable from servers)
 app.get('/api/:neighborhood/reddit', async (req, res) => {
   const sub = slugToSubreddit(req.params.neighborhood);
@@ -32,10 +36,10 @@ app.get('/api/:neighborhood/reddit', async (req, res) => {
       let image = '';
       const imgMatch = content.match(/&lt;img\s[^&]*src=&quot;([^&]*)&quot;/i)
         || content.match(/<img[^>]*src="([^"]*)"[^>]*/i);
-      if (imgMatch) image = imgMatch[1];
+      if (imgMatch) image = decodeHtmlEntities(imgMatch[1]);
       // Extract thumbnail from media:thumbnail
       const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
-      if (thumbMatch) image = thumbMatch[1];
+      if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
       const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
       posts.push({ title, url: link, permalink: link, created, image, score: 0, num_comments: 0, flair: '' });
     }
@@ -74,7 +78,7 @@ app.get('/api/:neighborhood/qns', async (req, res) => {
           url: titleMatch[1],
           timestamp,
           category: categoryMatch ? categoryMatch[2].replace(/<[^>]*>/g, '').trim() : '',
-          image: imgMatch ? imgMatch[1] : '',
+          image: imgMatch ? decodeHtmlEntities(imgMatch[1]) : '',
         });
       }
     }
