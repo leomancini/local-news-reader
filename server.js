@@ -112,11 +112,18 @@ function getCachedGeocode(address, neighborhood) {
 }
 
 // ── HTML helpers ──
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  ndash: '–', mdash: '—', lsquo: '\u2018', rsquo: '\u2019',
+  ldquo: '\u201C', rdquo: '\u201D', hellip: '…', bull: '•',
+  copy: '©', reg: '®', trade: '™', '#39': "'",
+};
+
 function decodeHtmlEntities(str) {
   return str
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+    .replace(/&([a-z#0-9]+);/gi, (m, name) => NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? m);
 }
 
 function upgradeQnsImage(url) {
@@ -208,7 +215,7 @@ async function fetchQns(slug) {
       }
       let excerpt = '';
       if (descMatch) {
-        excerpt = descMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        excerpt = decodeHtmlEntities(descMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim());
         if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
       }
       const rawImg = imgMatch ? decodeHtmlEntities(imgMatch[1]) : '';
@@ -266,7 +273,8 @@ async function fetchYimby(slug) {
         excerpt = excerptMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
         if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '…';
       }
-      const t = titleMatch[2].replace(/<[^>]*>/g, '').trim();
+      const t = decodeHtmlEntities(titleMatch[2].replace(/<[^>]*>/g, '').trim());
+      if (excerpt) excerpt = decodeHtmlEntities(excerpt);
       const address = extractAddress(t) || extractAddress(excerpt);
       articles.push({
         title: t,
