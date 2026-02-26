@@ -11,9 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.3.1",
     "express": "^4.19.2",
     "path": "^0.12.7",
     "url": "^0.11.3"
   }
 }
-

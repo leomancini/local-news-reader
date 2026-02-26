@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 import express from 'express';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
@@ -77,32 +79,67 @@ function extractAddress(text) {
   return addr;
 }
 
-// ── Geocoding (NYC GeoSearch — free, no API key, NYC-specific) ──
+// ── Geocoding ──
+// Regular addresses → NYC GeoSearch (free, no API key)
+// Intersections → Claude Haiku (LLM knows NYC geography)
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+
+async function geocodeAddress(address, neighborhood) {
+  const searchText = neighborhood ? `${address}, ${neighborhood}` : address;
+  try {
+    const resp = await fetch(`https://geosearch.planninglabs.nyc/v2/search?text=${encodeURIComponent(searchText)}&size=1`);
+    const data = await resp.json();
+    const feature = data.features?.[0];
+    return feature
+      ? { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] }
+      : null;
+  } catch { return null; }
+}
+
+async function geocodeIntersection(address, neighborhood) {
+  if (!ANTHROPIC_API_KEY) return null;
+  const location = neighborhood
+    ? `${address} in ${neighborhood}, Queens, NY`
+    : `${address}, Queens, NY`;
+  try {
+    // Ask LLM for a real nearby address, then geocode it precisely
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 40,
+        messages: [{
+          role: 'user',
+          content: `Give me a real street address at or very near the intersection of ${location}. Reply with ONLY the address, nothing else.`,
+        }],
+      }),
+    });
+    const data = await resp.json();
+    const nearbyAddr = data.content?.[0]?.text?.trim();
+    if (!nearbyAddr) return null;
+    // Geocode the LLM-suggested address with NYC GeoSearch for precision
+    return await geocodeAddress(nearbyAddr, '');
+  } catch { return null; }
+}
+
 async function resolveGeocode(address, neighborhood) {
   if (!address) return null;
   const rkey = `${address}|${neighborhood}`;
   if (resolvedCache.has(rkey)) return resolvedCache.get(rkey);
 
-  // For intersections, geocode just the first street
   const isIntersection = /\band\b/i.test(address);
-  const query = isIntersection ? address.split(/\band\b/i)[0].trim() : address;
-  const searchText = neighborhood ? `${query}, ${neighborhood}` : query;
+  const result = isIntersection
+    ? await geocodeIntersection(address, neighborhood)
+    : await geocodeAddress(address, neighborhood);
 
-  try {
-    const resp = await fetch(`https://geosearch.planninglabs.nyc/v2/search?text=${encodeURIComponent(searchText)}&size=1`);
-    const data = await resp.json();
-    const feature = data.features?.[0];
-    const result = feature
-      ? { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] }
-      : null;
-    resolvedCache.set(rkey, result);
-    cacheDirty = true;
-    return result;
-  } catch {
-    resolvedCache.set(rkey, null);
-    cacheDirty = true;
-    return null;
-  }
+  resolvedCache.set(rkey, result);
+  cacheDirty = true;
+  return result;
 }
 
 function getCachedGeocode(address, neighborhood) {
