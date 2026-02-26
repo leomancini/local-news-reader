@@ -486,22 +486,39 @@ function getNeighborhoodPage(slug) {
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>${displayName}</h1>
-      <div class="filter-tabs">
-        <button class="filter-tab active" data-source="all">All</button>
-        <button class="filter-tab" data-source="reddit">Reddit</button>
-        <button class="filter-tab" data-source="qns">QNS</button>
-        <button class="filter-tab" data-source="yimby">YIMBY</button>
-        <button class="settings-link" aria-label="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
+    <div id="page-feed">
+      <header>
+        <h1>${displayName}</h1>
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-source="all">All</button>
+          <button class="filter-tab" data-source="reddit">Reddit</button>
+          <button class="filter-tab" data-source="qns">QNS</button>
+          <button class="filter-tab" data-source="yimby">YIMBY</button>
+          <button class="settings-link" aria-label="Settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="feed-container">
+        <div id="loading" class="loading">Loading news from all sources...</div>
+        <ul id="feed" class="post-list"></ul>
       </div>
-    </header>
+    </div>
 
-    <div class="feed-container">
-      <div id="loading" class="loading">Loading news from all sources...</div>
-      <ul id="feed" class="post-list"></ul>
+    <div id="page-settings" style="display:none">
+      <header>
+        <button class="back">&larr; ${displayName}</button>
+        <h1>Settings</h1>
+      </header>
+      <div class="settings-list">
+        <div class="settings-row" id="crimeRow">
+          <div class="settings-label">
+            <span class="settings-title">Show crime stories</span>
+            <span class="settings-desc">Include articles about crime, police, and arrests</span>
+          </div>
+          <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -644,38 +661,31 @@ function getNeighborhoodPage(slug) {
         document.getElementById('loading').textContent = 'Failed to load news';
       });
 
-    // Instant settings navigation
-    let feedHTML = null;
-
-    function initSettingsToggle() {
-      const toggle = document.getElementById('crimeToggle');
-      if (!toggle) return;
-      if (localStorage.getItem('showCrime') === '1') toggle.classList.add('on');
-      toggle.addEventListener('click', () => {
-        const isOn = toggle.classList.toggle('on');
-        localStorage.setItem('showCrime', isOn ? '1' : '0');
-      });
-    }
-
+    // Instant settings navigation — toggle visibility, no DOM destruction
+    const pageFeed = document.getElementById('page-feed');
+    const pageSettings = document.getElementById('page-settings');
     const DISPLAY = SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
-    const settingsHTML = '<header><button class="back">&larr; ' + DISPLAY + '</button><h1>Settings</h1></header><div class="settings-list"><div class="settings-row" id="crimeRow"><div class="settings-label"><span class="settings-title">Show crime stories</span><span class="settings-desc">Include articles about crime, police, and arrests</span></div><div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div></div></div>';
+
+    // Init toggle once since it's always in the DOM
+    const toggle = document.getElementById('crimeToggle');
+    if (localStorage.getItem('showCrime') === '1') toggle.classList.add('on');
+    toggle.addEventListener('click', () => {
+      const isOn = toggle.classList.toggle('on');
+      localStorage.setItem('showCrime', isOn ? '1' : '0');
+    });
 
     function showSettings() {
-      feedHTML = document.querySelector('.container').innerHTML;
-      document.querySelector('.container').innerHTML = settingsHTML;
+      pageFeed.style.display = 'none';
+      pageSettings.style.display = '';
       document.title = 'Settings - ' + DISPLAY;
-      initSettingsToggle();
       window.scrollTo(0, 0);
     }
 
     function showFeed() {
-      if (feedHTML) {
-        document.querySelector('.container').innerHTML = feedHTML;
-        document.title = DISPLAY;
-        filterFeed();
-      } else {
-        location.href = '/' + SLUG;
-      }
+      pageSettings.style.display = 'none';
+      pageFeed.style.display = '';
+      document.title = DISPLAY;
+      filterFeed();
     }
 
     let navLock = false;
