@@ -29,14 +29,25 @@ function setCache(key, data) {
 
 // ── Geocode caching (persistent to disk) ──
 const GEOCODE_CACHE_FILE = new URL('geocode-cache.json', import.meta.url).pathname;
-const resolvedCache = new Map(); // address|neighborhood → { lat, lng } | null
+const resolvedCache = new Map(); // address|neighborhood → { result, ts }
+const NULL_TTL = 24 * 60 * 60 * 1000; // retry failed lookups after 24h
 let cacheDirty = false;
 
 try {
   if (existsSync(GEOCODE_CACHE_FILE)) {
     const data = JSON.parse(readFileSync(GEOCODE_CACHE_FILE, 'utf8'));
-    for (const [k, v] of Object.entries(data)) resolvedCache.set(k, v);
-    console.log(`Loaded ${resolvedCache.size} cached geocode results`);
+    let migrated = 0;
+    for (const [k, v] of Object.entries(data)) {
+      // Migrate old format (bare value) → new format ({ result, ts })
+      if (v === null || (v && v.lat !== undefined && v.ts === undefined)) {
+        resolvedCache.set(k, { result: v, ts: Date.now() });
+        migrated++;
+      } else {
+        resolvedCache.set(k, v);
+      }
+    }
+    if (migrated > 0) cacheDirty = true;
+    console.log(`Loaded ${resolvedCache.size} cached geocode results${migrated ? ` (migrated ${migrated})` : ''}`);
   }
 } catch { /* start fresh */ }
 
@@ -127,25 +138,47 @@ async function geocodeIntersection(address, neighborhood) {
   } catch { return null; }
 }
 
+const inflight = new Map(); // dedup concurrent geocode requests
+
 async function resolveGeocode(address, neighborhood) {
   if (!address) return null;
   const rkey = `${address}|${neighborhood}`;
-  if (resolvedCache.has(rkey)) return resolvedCache.get(rkey);
 
-  const isIntersection = /\band\b/i.test(address);
-  const result = isIntersection
-    ? await geocodeIntersection(address, neighborhood)
-    : await geocodeAddress(address, neighborhood);
+  // Check cache (with TTL for null results)
+  const cached = resolvedCache.get(rkey);
+  if (cached) {
+    if (cached.result !== null) return cached.result;           // positive hit — never expires
+    if (Date.now() - cached.ts < NULL_TTL) return null;        // negative hit — still fresh
+    // else: negative hit expired, fall through to re-geocode
+  }
 
-  resolvedCache.set(rkey, result);
-  cacheDirty = true;
-  return result;
+  // Dedup: if another request is already geocoding this address, wait for it
+  if (inflight.has(rkey)) return inflight.get(rkey);
+
+  const promise = (async () => {
+    const isIntersection = /\band\b/i.test(address);
+    const result = isIntersection
+      ? await geocodeIntersection(address, neighborhood)
+      : await geocodeAddress(address, neighborhood);
+
+    resolvedCache.set(rkey, { result, ts: Date.now() });
+    cacheDirty = true;
+    inflight.delete(rkey);
+    return result;
+  })();
+
+  inflight.set(rkey, promise);
+  return promise;
 }
 
 function getCachedGeocode(address, neighborhood) {
   if (!address) return null;
   const rkey = `${address}|${neighborhood}`;
-  return resolvedCache.has(rkey) ? resolvedCache.get(rkey) : undefined;
+  const cached = resolvedCache.get(rkey);
+  if (!cached) return undefined;                                // never looked up
+  if (cached.result !== null) return cached.result;             // positive hit
+  if (Date.now() - cached.ts < NULL_TTL) return null;          // negative hit, still fresh
+  return undefined;                                             // negative hit expired — treat as uncached
 }
 
 // ── HTML helpers ──
@@ -366,7 +399,7 @@ app.get('/api/:neighborhood/feed', async (req, res) => {
     if (uncached.length > 0) {
       (async () => {
         for (const addr of uncached) {
-          await resolveGeocode(addr, neighborhood);
+          try { await resolveGeocode(addr, neighborhood); } catch { /* skip */ }
         }
         saveResolvedCache();
       })();
