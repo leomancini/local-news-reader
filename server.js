@@ -241,9 +241,14 @@ function getNeighborhoodPage(slug) {
       });
     });
 
-    function formatDate(epoch) {
+    function timeAgo(epoch) {
       if (!epoch) return '';
-      return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const diff = Date.now() / 1000 - epoch;
+      if (diff < 0) return '';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
+      return Math.floor(diff / 2592000) + 'mo ago';
     }
 
     function esc(s) {
@@ -328,7 +333,7 @@ function getNeighborhoodPage(slug) {
         li.dataset.crime = crime;
         if (crime && !showCrime()) li.style.display = 'none';
 
-        const date = item.timestamp ? formatDate(item.timestamp) : '';
+        const date = item.timestamp ? timeAgo(item.timestamp) : '';
         const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source];
 
         li.innerHTML =
