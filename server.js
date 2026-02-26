@@ -788,24 +788,21 @@ function getStyles() {
     h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
-    h2 a:hover { text-decoration: underline; }
+    a, button { touch-action: manipulation; }
     .ios-toggle { width: 50px; height: 30px; border-radius: 15px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     .ios-toggle.on .ios-knob { transform: translateX(22px); }
     .settings-link { margin-left: auto; }
     .settings-link { color: #999; transition: color 0.15s; padding: 4px; }
-    .settings-link:hover { color: #333; }
     .settings-list { max-width: 720px; }
     .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
     .settings-label { flex: 1; margin-right: 16px; }
     .settings-title { display: block; font-size: 16px; font-weight: 500; color: #333; }
     .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; }
-    .back:hover { color: #333; }
-    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 12px 0 16px; flex-wrap: wrap; }
+    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-    .filter-tab:hover { background: #ddd; }
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { max-width: 720px; }
@@ -813,7 +810,6 @@ function getStyles() {
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
     .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
-    .post-title:hover { text-decoration: underline; }
     .meta { font-size: 14px; color: #888; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; height: 200px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; background: #eee; }
@@ -824,7 +820,14 @@ function getStyles() {
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     .hood-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
     .hood-grid a { display: block; padding: 14px 16px; background: #fff; border-radius: 12px; color: #333; text-decoration: none; font-size: 15px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.15s; }
-    .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    @media (hover: hover) {
+      h2 a:hover { text-decoration: underline; }
+      .settings-link:hover { color: #333; }
+      .back:hover { color: #333; }
+      .filter-tab:hover { background: #ddd; }
+      .post-title:hover { text-decoration: underline; }
+      .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    }
   `;
 }
 
