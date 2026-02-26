@@ -218,7 +218,13 @@ function getNeighborhoodPage(slug) {
     <header>
       <a href="/" class="back">&larr; Home</a>
       <h1>${displayName}</h1>
-      <div class="header-row">
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-source="all">All</button>
+        <button class="filter-tab" data-source="reddit">Reddit</button>
+        <button class="filter-tab" data-source="qns">QNS</button>
+        <button class="filter-tab" data-source="yimby">YIMBY</button>
+      </div>
+      <div class="controls-row">
         <div class="crime-toggle">
           <label>
             <input type="checkbox" id="crimeToggle" checked>
@@ -226,9 +232,8 @@ function getNeighborhoodPage(slug) {
           </label>
         </div>
         <div class="sources">
-          Sources:
           <a href="https://www.reddit.com/r/${subreddit}" target="_blank">r/${subreddit}</a>
-          <a href="https://qns.com/neighborhoods/${slug}/" target="_blank">QNS.com</a>
+          <a href="https://qns.com/neighborhoods/${slug}/" target="_blank">QNS</a>
           <a href="https://newyorkyimby.com/neighborhoods/${slug}" target="_blank">YIMBY</a>
         </div>
       </div>
@@ -253,13 +258,26 @@ function getNeighborhoodPage(slug) {
       return document.getElementById('crimeToggle').checked;
     }
 
-    document.getElementById('crimeToggle').addEventListener('change', () => {
-      document.querySelectorAll('.post-item').forEach(el => {
-        if (el.dataset.crime === 'true') {
-          el.style.display = showCrime() ? '' : 'none';
-        }
+    let activeSource = 'all';
+
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelector('.filter-tab.active').classList.remove('active');
+        tab.classList.add('active');
+        activeSource = tab.dataset.source;
+        filterFeed();
       });
     });
+
+    document.getElementById('crimeToggle').addEventListener('change', filterFeed);
+
+    function filterFeed() {
+      document.querySelectorAll('.post-item').forEach(el => {
+        const sourceHidden = activeSource !== 'all' && el.dataset.source !== activeSource;
+        const crimeHidden = el.dataset.crime === 'true' && !showCrime();
+        el.style.display = (sourceHidden || crimeHidden) ? 'none' : '';
+      });
+    }
 
     function timeAgo(epoch) {
       if (!epoch) return '';
@@ -352,7 +370,9 @@ function getNeighborhoodPage(slug) {
         const li = document.createElement('li');
         li.className = 'post-item';
         li.dataset.crime = crime;
-        if (crime && !showCrime()) li.style.display = 'none';
+        li.dataset.source = item.source;
+        const sourceHidden = activeSource !== 'all' && item.source !== activeSource;
+        if ((crime && !showCrime()) || sourceHidden) li.style.display = 'none';
 
         const date = item.timestamp ? timeAgo(item.timestamp) : '';
         const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source];
@@ -390,20 +410,24 @@ function getStyles() {
     h2 a:hover { text-decoration: underline; }
     .crime-toggle { margin-bottom: 8px; }
     .crime-toggle label { font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-    .header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .filter-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-size: 14px; cursor: pointer; transition: all 0.15s; }
+    .filter-tab:hover { background: #ddd; }
+    .filter-tab.active { background: #333; color: #fff; }
+    .controls-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
     .sources { font-size: 13px; color: #888; }
     .sources a { color: #1a73e8; text-decoration: none; margin-left: 8px; }
     .sources a:hover { text-decoration: underline; }
     .feed-container { max-width: 720px; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-    .post-item { padding: 24px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
     .post-title { color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
     .post-title:hover { text-decoration: underline; }
     .meta { font-size: 12px; color: #888; margin-top: 6px; display: block; }
     .flair { display: inline-block; font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 6px; border-radius: 4px; margin-top: 4px; }
     .excerpt { font-size: 13px; color: #666; margin-top: 4px; line-height: 1.4; }
-    .thumb { width: calc(100% + 48px); margin: -24px -24px 14px -24px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
+    .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; max-height: 300px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     form { display: flex; gap: 8px; margin: 16px 0; }
     form input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
