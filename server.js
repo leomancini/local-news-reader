@@ -487,10 +487,7 @@ function getNeighborhoodPage(slug) {
         <button class="filter-tab" data-source="reddit">Reddit</button>
         <button class="filter-tab" data-source="qns">QNS</button>
         <button class="filter-tab" data-source="yimby">YIMBY</button>
-      </div>
-      <div class="toggle-row">
-        <span class="toggle-label">Crime</span>
-        <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
+        <div class="ios-toggle" id="crimeToggle"><span class="toggle-text">Crime</span><div class="ios-knob"></div></div>
       </div>
     </header>
 
@@ -664,17 +661,16 @@ function getStyles() {
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
     h2 a:hover { text-decoration: underline; }
-    .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .toggle-label { font-size: 14px; color: #666; }
-    .ios-toggle { width: 44px; height: 26px; border-radius: 13px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .ios-toggle { margin-left: auto; width: 76px; height: 32px; border-radius: 16px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
     .ios-toggle.on { background: #333; }
-    .ios-knob { width: 22px; height: 22px; border-radius: 11px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .ios-toggle.on .ios-knob { transform: translateX(18px); }
-    .filter-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .toggle-text { position: absolute; top: 50%; transform: translateY(-50%); left: 28px; font-size: 13px; font-weight: 600; color: #888; transition: all 0.2s; user-select: none; }
+    .ios-toggle.on .toggle-text { left: 10px; color: #fff; }
+    .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .ios-toggle.on .ios-knob { transform: translateX(44px); }
+    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab:hover { background: #ddd; }
     .filter-tab.active { background: #333; color: #fff; }
-    .filter-tabs { flex-wrap: wrap; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { max-width: 720px; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
