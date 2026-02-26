@@ -697,24 +697,12 @@ function getNeighborhoodPage(slug) {
         e.preventDefault();
         navLock = true;
         showSettings();
-        history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
         setTimeout(() => { navLock = false; }, 100);
       } else if (back) {
         e.preventDefault();
         navLock = true;
         showFeed();
-        history.pushState({ page: 'feed' }, '', '/' + SLUG);
         setTimeout(() => { navLock = false; }, 100);
-      }
-    });
-
-    window.addEventListener('popstate', (e) => {
-      if (e.state && e.state.page === 'feed') {
-        showFeed();
-      } else if (e.state && e.state.page === 'settings') {
-        showSettings();
-      } else {
-        location.reload();
       }
     });
   <\/script>
