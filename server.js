@@ -800,7 +800,8 @@ function getStyles() {
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     .ios-toggle.on .ios-knob { transform: translateX(22px); }
-    .settings-link { margin-left: auto; color: #999; padding: 4px; background: none; border: none; cursor: pointer; }
+    .settings-link { margin-left: auto; color: #999; padding: 4px; background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
+    .settings-link:active { color: #999; }
     .settings-list { max-width: 720px; }
     .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
     .settings-label { flex: 1; margin-right: 16px; }
