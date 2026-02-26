@@ -256,14 +256,9 @@ function getNeighborhoodPage(slug) {
       <div class="controls-row">
         <div class="crime-toggle">
           <label>
-            <input type="checkbox" id="crimeToggle" checked>
+            <input type="checkbox" id="crimeToggle">
             Include crime news
           </label>
-        </div>
-        <div class="sources">
-          <a href="https://www.reddit.com/r/${subreddit}" target="_blank">r/${subreddit}</a>
-          <a href="https://qns.com/neighborhoods/${slug}/" target="_blank">QNS</a>
-          <a href="https://newyorkyimby.com/neighborhoods/${slug}" target="_blank">YIMBY</a>
         </div>
       </div>
     </header>
@@ -443,9 +438,7 @@ function getStyles() {
     .filter-tab:hover { background: #ddd; }
     .filter-tab.active { background: #333; color: #fff; }
     .controls-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
-    .sources { font-size: 13px; color: #888; }
-    .sources a { color: #1a73e8; text-decoration: none; margin-left: 8px; }
-    .sources a:hover { text-decoration: underline; }
+    * { -webkit-tap-highlight-color: transparent; }
     .feed-container { max-width: 720px; }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
