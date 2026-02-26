@@ -657,32 +657,39 @@ function getNeighborhoodPage(slug) {
       });
     }
 
-    function navigateToSettings(e) {
-      e.preventDefault();
+    const DISPLAY = SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+    const settingsHTML = '<header><a href="/' + SLUG + '" class="back">&larr; ' + DISPLAY + '</a><h1>Settings</h1></header><div class="settings-list"><div class="settings-row" id="crimeRow"><div class="settings-label"><span class="settings-title">Show crime stories</span><span class="settings-desc">Include articles about crime, police, and arrests</span></div><div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div></div></div>';
+
+    function showSettings() {
       feedHTML = document.querySelector('.container').innerHTML;
-      fetch('/' + SLUG + '/settings?partial=1')
-        .then(r => r.text())
-        .then(html => {
-          document.querySelector('.container').innerHTML = html;
-          document.title = 'Settings - ' + SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
-          history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
-          initSettingsToggle();
-          document.querySelector('.back').addEventListener('click', navigateBack);
-          window.scrollTo(0, 0);
-        });
+      document.querySelector('.container').innerHTML = settingsHTML;
+      document.title = 'Settings - ' + DISPLAY;
+      initSettingsToggle();
+      document.querySelector('.back').addEventListener('click', showFeed);
+      window.scrollTo(0, 0);
     }
 
-    function navigateBack(e) {
-      e.preventDefault();
+    function showFeed() {
       if (feedHTML) {
         document.querySelector('.container').innerHTML = feedHTML;
-        document.title = SLUG.replace(/-/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
-        history.pushState({ page: 'feed' }, '', '/' + SLUG);
+        document.title = DISPLAY;
         rebindSettingsLink();
         filterFeed();
       } else {
         location.href = '/' + SLUG;
       }
+    }
+
+    function navigateToSettings(e) {
+      e.preventDefault();
+      showSettings();
+      history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
+    }
+
+    function navigateBack(e) {
+      e.preventDefault();
+      showFeed();
+      history.pushState({ page: 'feed' }, '', '/' + SLUG);
     }
 
     function rebindSettingsLink() {
@@ -693,18 +700,10 @@ function getNeighborhoodPage(slug) {
     rebindSettingsLink();
 
     window.addEventListener('popstate', (e) => {
-      if (e.state && e.state.page === 'feed' && feedHTML) {
-        document.querySelector('.container').innerHTML = feedHTML;
-        rebindSettingsLink();
-        filterFeed();
+      if (e.state && e.state.page === 'feed') {
+        showFeed();
       } else if (e.state && e.state.page === 'settings') {
-        fetch('/' + SLUG + '/settings?partial=1')
-          .then(r => r.text())
-          .then(html => {
-            document.querySelector('.container').innerHTML = html;
-            initSettingsToggle();
-            document.querySelector('.back').addEventListener('click', navigateBack);
-          });
+        showSettings();
       } else {
         location.reload();
       }
