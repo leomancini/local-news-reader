@@ -12,10 +12,16 @@ function slugToQuery(slug) {
 }
 
 // Address extraction for map pins
+const STREET_SUFFIXES = /(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?)(?:\s|,|$)/i;
+
 function extractAddress(text) {
   if (!text) return '';
-  const m = text.match(/\d+[-–]?\d*\s+(?:[NSEW]\.\s+)?(?:[\dA-Za-z][\w]*[.\s]*)+?(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?)\b/i);
-  return m ? m[0].trim() : '';
+  // Find a street suffix, then look backwards for the house number
+  const suffixMatch = STREET_SUFFIXES.exec(text);
+  if (!suffixMatch) return '';
+  const before = text.substring(0, suffixMatch.index + suffixMatch[0].length);
+  const m = before.match(/(\d+[-–]?\d*\s+(?:[NSEW]\.\s+)?(?:[\w]+\s+){0,4}(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Place|Pl\.?|Road|Rd\.?|Drive|Dr\.?|Way|Court|Ct\.?|Lane|Ln\.?|Plaza|Broadway|Parkway|Pkwy\.?))/i);
+  return m ? m[1].trim() : '';
 }
 
 // Geocoding with in-memory cache + rate limiting
