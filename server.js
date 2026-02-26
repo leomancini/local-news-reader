@@ -661,12 +661,12 @@ function getStyles() {
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
     h2 a:hover { text-decoration: underline; }
-    .ios-toggle { margin-left: auto; width: 76px; height: 32px; border-radius: 16px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .ios-toggle { margin-left: auto; width: 86px; height: 32px; border-radius: 16px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
     .ios-toggle.on { background: #333; }
-    .toggle-text { position: absolute; top: 50%; transform: translateY(-50%); left: 28px; font-size: 13px; font-weight: 600; color: #888; transition: all 0.2s; user-select: none; }
+    .toggle-text { position: absolute; top: 50%; transform: translateY(-50%); left: 32px; font-size: 13px; font-weight: 600; color: #888; transition: all 0.2s; user-select: none; }
     .ios-toggle.on .toggle-text { left: 10px; color: #fff; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .ios-toggle.on .ios-knob { transform: translateX(44px); }
+    .ios-toggle.on .ios-knob { transform: translateX(54px); }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab:hover { background: #ddd; }
