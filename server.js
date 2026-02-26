@@ -39,7 +39,7 @@ async function geocodeAddress(address) {
   lastGeocode = Date.now();
 
   try {
-    const q = encodeURIComponent(address + ', New York, NY');
+    const q = encodeURIComponent(address);
     const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
       headers: { 'User-Agent': 'local-news-reader/1.0 (neighborhood news aggregator)' }
     });
@@ -234,8 +234,10 @@ app.get('/api/:neighborhood/yimby', async (req, res) => {
 // API: Geocode (cached, rate-limited Nominatim proxy)
 app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
+  const neighborhood = (req.query.neighborhood || '').replace(/-/g, ' ').trim();
   if (!q) return res.json({ lat: null, lng: null });
-  const result = await geocodeAddress(q);
+  const fullQuery = neighborhood ? `${q}, ${neighborhood}, New York` : q;
+  const result = await geocodeAddress(fullQuery);
   res.json(result || { lat: null, lng: null });
 });
 
@@ -479,7 +481,7 @@ function getNeighborhoodPage(slug) {
 
       // Geocode addresses and init maps
       mapTargets.forEach(t => {
-        fetch('/api/geocode?q=' + encodeURIComponent(t.address))
+        fetch('/api/geocode?q=' + encodeURIComponent(t.address) + '&neighborhood=' + encodeURIComponent(SLUG))
           .then(r => r.json())
           .then(geo => {
             if (!geo.lat || !geo.lng) {
