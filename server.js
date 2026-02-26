@@ -680,10 +680,14 @@ function getNeighborhoodPage(slug) {
       }
     }
 
+    let settingsNav = false;
     function navigateToSettings(e) {
       e.preventDefault();
+      if (settingsNav) return;
+      settingsNav = true;
       showSettings();
       history.pushState({ page: 'settings' }, '', '/' + SLUG + '/settings');
+      setTimeout(() => { settingsNav = false; }, 100);
     }
 
     function navigateBack(e) {
@@ -694,7 +698,10 @@ function getNeighborhoodPage(slug) {
 
     function rebindSettingsLink() {
       const link = document.querySelector('.settings-link');
-      if (link) link.addEventListener('click', navigateToSettings);
+      if (link) {
+        link.addEventListener('touchstart', navigateToSettings, { passive: false });
+        link.addEventListener('click', navigateToSettings);
+      }
     }
 
     rebindSettingsLink();
@@ -793,7 +800,7 @@ function getStyles() {
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
     .ios-toggle.on .ios-knob { transform: translateX(22px); }
-    .settings-link { margin-left: auto; color: #999; transition: color 0.15s; padding: 4px; background: none; border: none; cursor: pointer; }
+    .settings-link { margin-left: auto; color: #999; padding: 4px; background: none; border: none; cursor: pointer; }
     .settings-list { max-width: 720px; }
     .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
     .settings-label { flex: 1; margin-right: 16px; }
