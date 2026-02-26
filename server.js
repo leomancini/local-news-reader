@@ -221,7 +221,7 @@ async function fetchReddit(slug) {
     const address = extractAddress(title) || extractAddress(excerpt);
     posts.push({ title, url: link, created, image, excerpt, source: 'reddit', flair: '', address });
   }
-  setCache(key, posts);
+  if (posts.length > 0) setCache(key, posts);
   return posts;
 }
 
@@ -269,7 +269,7 @@ async function fetchQns(slug) {
       });
     }
   }
-  setCache(key, articles);
+  if (articles.length > 0) setCache(key, articles);
   return articles;
 }
 
@@ -324,7 +324,7 @@ async function fetchYimby(slug) {
       });
     }
   }
-  setCache(key, articles);
+  if (articles.length > 0) setCache(key, articles);
   return articles;
 }
 
