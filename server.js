@@ -431,6 +431,11 @@ app.get('/:neighborhood', (req, res) => {
   res.send(getNeighborhoodPage(slug));
 });
 
+app.get('/:neighborhood/settings', (req, res) => {
+  const slug = req.params.neighborhood;
+  res.send(getSettingsPage(slug));
+});
+
 function getHomePage() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -481,13 +486,17 @@ function getNeighborhoodPage(slug) {
 <body>
   <div class="container">
     <header>
-      <h1>${displayName}</h1>
+      <div class="header-row">
+        <h1>${displayName}</h1>
+        <a href="/${slug}/settings" class="settings-link" aria-label="Settings">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </a>
+      </div>
       <div class="filter-tabs">
         <button class="filter-tab active" data-source="all">All</button>
         <button class="filter-tab" data-source="reddit">Reddit</button>
         <button class="filter-tab" data-source="qns">QNS</button>
         <button class="filter-tab" data-source="yimby">YIMBY</button>
-        <div class="ios-toggle" id="crimeToggle"><span class="toggle-text">Crime</span><div class="ios-knob"></div></div>
       </div>
     </header>
 
@@ -506,26 +515,17 @@ function getNeighborhoodPage(slug) {
       return CRIME_KEYWORDS.some(k => lower.includes(k));
     }
 
-    let crimeOn = false;
-
-    function showCrime() { return crimeOn; }
+    function showCrime() { return localStorage.getItem('showCrime') === '1'; }
 
     let activeSource = 'all';
 
     document.querySelectorAll('.filter-tab').forEach(tab => {
-      if (tab.classList.contains('crime-btn')) return;
       tab.addEventListener('click', () => {
         document.querySelector('.filter-tab.active').classList.remove('active');
         tab.classList.add('active');
         activeSource = tab.dataset.source;
         filterFeed();
       });
-    });
-
-    document.getElementById('crimeToggle').addEventListener('click', () => {
-      crimeOn = !crimeOn;
-      document.getElementById('crimeToggle').classList.toggle('on', crimeOn);
-      filterFeed();
     });
 
     function filterFeed() {
@@ -649,24 +649,76 @@ function getNeighborhoodPage(slug) {
 </html>`;
 }
 
+function getSettingsPage(slug) {
+  const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - ${displayName}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
+  <style>${getStyles()}</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/${slug}" class="back">&larr; ${displayName}</a>
+      <h1>Settings</h1>
+    </header>
+
+    <div class="settings-list">
+      <div class="settings-row" id="crimeRow">
+        <div class="settings-label">
+          <span class="settings-title">Show crime stories</span>
+          <span class="settings-desc">Include articles about crime, police, and arrests</span>
+        </div>
+        <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('crimeToggle');
+    const on = localStorage.getItem('showCrime') === '1';
+    if (on) toggle.classList.add('on');
+
+    toggle.addEventListener('click', () => {
+      const isOn = toggle.classList.toggle('on');
+      localStorage.setItem('showCrime', isOn ? '1' : '0');
+    });
+  <\/script>
+</body>
+</html>`;
+}
+
 function getStyles() {
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; }
     .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
     header { margin-bottom: 24px; }
-    .back { color: #666; text-decoration: none; font-size: 14px; }
-    .back:hover { color: #333; }
-    h1 { font-family: 'Lora', Georgia, serif; font-size: 32px; margin: 0 0 12px; padding: 0; }
+    h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
     h2 a:hover { text-decoration: underline; }
-    .ios-toggle { margin-left: auto; width: 86px; height: 32px; border-radius: 16px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .ios-toggle { width: 50px; height: 30px; border-radius: 15px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
     .ios-toggle.on { background: #333; }
-    .toggle-text { position: absolute; top: 50%; transform: translateY(-50%); left: 32px; font-size: 13px; font-weight: 600; color: #888; transition: all 0.2s; user-select: none; }
-    .ios-toggle.on .toggle-text { left: 10px; color: #fff; }
-    .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .ios-toggle.on .ios-knob { transform: translateX(54px); }
+    .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .ios-toggle.on .ios-knob { transform: translateX(22px); }
+    .header-row { display: flex; align-items: center; justify-content: space-between; }
+    .settings-link { color: #999; transition: color 0.15s; padding: 4px; }
+    .settings-link:hover { color: #333; }
+    .settings-list { max-width: 720px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
+    .settings-label { flex: 1; margin-right: 16px; }
+    .settings-title { display: block; font-size: 16px; font-weight: 500; color: #333; }
+    .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
+    .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; }
+    .back:hover { color: #333; }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab:hover { background: #ddd; }
