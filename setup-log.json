@@ -1,0 +1,9 @@
+{
+  "service_id": "local-news-reader",
+  "service_name": "Local News Reader",
+  "domain": "https://local-news-reader.noshado.ws",
+  "host": "localhost",
+  "port": "3126",
+  "author": "leo",
+  "created_on": "Wed 25 Feb 2026 11:43:05 PM EST"
+}

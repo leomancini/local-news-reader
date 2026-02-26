@@ -1,0 +1,19 @@
+{
+  "name": "local-news-reader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node /home/leo/services/local-news-reader/server.js",
+    "dev": "nodemon server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "path": "^0.12.7",
+    "url": "^0.11.3"
+  }
+}
+
