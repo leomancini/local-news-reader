@@ -53,11 +53,13 @@ async function geocodeAddress(address) {
 
   try {
     const q = encodeURIComponent(address);
-    const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3`, {
       headers: { 'User-Agent': 'local-news-reader/1.0 (neighborhood news aggregator)' }
     });
     const data = await resp.json();
-    const result = data.length ? { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) } : null;
+    // Prefer house/road results, skip area-level matches (quarter, city, etc.)
+    const hit = data.find(d => ['house', 'residential', 'tertiary', 'secondary', 'primary', 'road', 'building'].includes(d.type) || d.class === 'building') || data[0];
+    const result = hit ? { lat: parseFloat(hit.lat), lng: parseFloat(hit.lon) } : null;
     geocodeCache.set(address, result);
     return result;
   } catch {
@@ -251,7 +253,14 @@ app.get('/api/geocode', async (req, res) => {
   if (!q) return res.json({ lat: null, lng: null });
   const normalized = normalizeStreetName(q);
   const fullQuery = neighborhood ? `${normalized}, ${neighborhood}, Queens, New York, NY` : normalized;
-  const result = await geocodeAddress(fullQuery);
+  let result = await geocodeAddress(fullQuery);
+  // Fallback: strip house number and try street + Queens (no neighborhood to avoid matching the area itself)
+  if (!result) {
+    const streetOnly = normalized.replace(/^\d+[-–]?\d*\s+/, '');
+    if (streetOnly !== normalized) {
+      result = await geocodeAddress(`${streetOnly}, Queens, NY`);
+    }
+  }
   res.json(result || { lat: null, lng: null });
 });
 
