@@ -263,11 +263,8 @@ function getNeighborhoodPage(slug) {
       const m = Math.floor(diff / 60);
       if (m < 60) return m + (m === 1 ? ' minute ago' : ' minutes ago');
       const h = Math.floor(diff / 3600);
-      if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
-      const d = Math.floor(diff / 86400);
-      if (d < 30) return d + (d === 1 ? ' day ago' : ' days ago');
-      const mo = Math.floor(diff / 2592000);
-      return mo + (mo === 1 ? ' month ago' : ' months ago');
+      if (h < 8) return h + (h === 1 ? ' hour ago' : ' hours ago');
+      return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     }
 
     function esc(s) {
