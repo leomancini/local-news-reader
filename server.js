@@ -241,14 +241,9 @@ function getNeighborhoodPage(slug) {
       });
     });
 
-    function timeAgo(epoch) {
+    function formatDate(epoch) {
       if (!epoch) return '';
-      const diff = Date.now() / 1000 - epoch;
-      if (diff < 0) return '';
-      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      if (diff < 2592000) return Math.floor(diff / 86400) + 'd ago';
-      return new Date(epoch * 1000).toLocaleDateString();
+      return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     function esc(s) {
@@ -273,7 +268,7 @@ function getNeighborhoodPage(slug) {
             url: p.permalink,
             timestamp: p.created || 0,
             source: 'reddit',
-            meta: p.score + ' pts · ' + p.num_comments + ' comments',
+            meta: '',
             flair: p.flair || '',
             excerpt: '',
             image: p.image || '',
@@ -333,7 +328,7 @@ function getNeighborhoodPage(slug) {
         li.dataset.crime = crime;
         if (crime && !showCrime()) li.style.display = 'none';
 
-        const time = item.timestamp ? timeAgo(item.timestamp) : '';
+        const date = item.timestamp ? formatDate(item.timestamp) : '';
         const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source];
 
         li.innerHTML =
@@ -341,8 +336,7 @@ function getNeighborhoodPage(slug) {
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           '<span class="meta">' +
             '<span class="source-badge source-' + item.source + '">' + sourceLabel + '</span>' +
-            (time ? ' · ' + time : '') +
-            (item.meta && item.source === 'reddit' ? ' · ' + esc(item.meta) : '') +
+            (date ? ' · ' + date : '') +
           '</span>' +
           (item.flair ? '<span class="flair">' + esc(item.flair) + '</span>' : '') +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '');
