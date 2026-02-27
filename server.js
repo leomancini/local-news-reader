@@ -782,7 +782,7 @@ function getSettingsPartial(slug) {
 function getStyles() {
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; }
+    body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; touch-action: pan-x pan-y; }
     .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
     header { margin-bottom: 24px; }
     h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; margin: 0 0 12px; padding: 0; }
