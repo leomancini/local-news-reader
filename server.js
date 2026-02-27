@@ -476,7 +476,10 @@ function getNeighborhoodPage(slug) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${displayName} - Local News</title>
+  <title>Local news in Middle Village</title>
+  <meta property="og:title" content="Local news in Middle Village">
+  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/JuniperSouth2.JPG/1280px-JuniperSouth2.JPG">
+  <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
@@ -494,7 +497,7 @@ function getNeighborhoodPage(slug) {
           <button class="filter-tab" data-source="reddit">Reddit</button>
           <button class="filter-tab" data-source="qns">QNS</button>
           <button class="filter-tab" data-source="yimby">YIMBY</button>
-          <button class="settings-link" aria-label="Settings">
+          <button type="button" class="settings-link" aria-label="Settings">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </div>
@@ -507,7 +510,7 @@ function getNeighborhoodPage(slug) {
 
     <div id="page-settings" style="display:none">
       <header>
-        <button class="back">&larr; ${displayName}</button>
+        <button type="button" class="back">&larr; ${displayName}</button>
         <h1>Settings</h1>
       </header>
       <div class="settings-list">
