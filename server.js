@@ -442,7 +442,7 @@ function getHomePage() {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Local News Reader</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -475,7 +475,7 @@ function getNeighborhoodPage(slug) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Local news in Middle Village</title>
   <meta property="og:title" content="Local news in Middle Village">
   <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/JuniperSouth2.JPG/1280px-JuniperSouth2.JPG">
@@ -720,7 +720,7 @@ function getSettingsPage(slug) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Settings - ${displayName}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -792,14 +792,15 @@ function getStyles() {
     .ios-toggle { width: 50px; height: 30px; border-radius: 15px; background: #ddd; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
     .ios-toggle.on { background: #333; }
     .ios-knob { width: 26px; height: 26px; border-radius: 13px; background: #fff; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .ios-toggle.on .ios-knob { transform: translateX(22px); }
+    .ios-toggle.on .ios-knob { transform: translateX(20px); }
     .settings-link { margin-left: auto; color: #999; padding: 4px; background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
     .settings-link:active { color: #999; }
     .settings-list { max-width: 720px; }
-    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #eee; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
     .settings-label { flex: 1; margin-right: 16px; }
     .settings-title { display: block; font-size: 16px; font-weight: 500; color: #333; }
     .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
+    #page-settings header { margin-top: 16px; }
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
     .back:active { color: #666; }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
