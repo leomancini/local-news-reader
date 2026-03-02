@@ -791,7 +791,7 @@ function getStyles() {
     body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; touch-action: pan-x pan-y; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     .container { max-width: 720px; margin: 0 auto; padding: 24px; }
     header { margin-bottom: 24px; }
-    h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; margin: 0 0 12px; padding: 0; }
+    h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; line-height: 1; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
     h2 a { color: #333; text-decoration: none; }
     a, button { touch-action: manipulation; }
@@ -806,7 +806,8 @@ function getStyles() {
     .settings-label { flex: 1; margin-right: 16px; }
     .settings-title { display: block; font-size: 16px; font-weight: 500; color: #333; }
     .settings-desc { display: block; font-size: 13px; color: #999; margin-top: 2px; }
-    #page-settings header { margin-top: 16px; }
+    #page-settings header { margin-top: 0; margin-bottom: 8px; }
+    #page-settings h1 { margin-top: 16px; margin-bottom: 0; }
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
     .back:active { color: #666; }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
