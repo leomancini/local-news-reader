@@ -826,7 +826,7 @@ function getStyles() {
       h2 a:hover { text-decoration: underline; }
       .settings-link:hover { color: #333; }
       .back:hover { color: #333; }
-      .filter-tab:hover { background: #ddd; }
+      .filter-tab:not(.active):hover { background: #ddd; }
       .post-title:hover { text-decoration: underline; }
       .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     }
