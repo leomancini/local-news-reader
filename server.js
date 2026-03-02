@@ -630,6 +630,12 @@ function getNeighborhoodPage(slug) {
            : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
            : '');
 
+        li.dataset.href = item.url;
+        li.addEventListener('click', function(e) {
+          if (e.target.closest('.card-map, .card-map-placeholder')) return;
+          window.open(this.dataset.href, '_blank');
+        });
+
         ul.appendChild(li);
 
         if (hasCoords) {
@@ -782,8 +788,8 @@ function getSettingsPartial(slug) {
 function getStyles() {
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; touch-action: pan-x pan-y; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; touch-action: pan-x pan-y; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px; }
     header { margin-bottom: 24px; }
     h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
@@ -807,10 +813,10 @@ function getStyles() {
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
-    .feed-container { max-width: 720px; }
+    .feed-container { }
     .loading { color: #999; font-size: 14px; padding: 20px 0; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; }
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
     .meta { font-size: 14px; color: #888; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; }
@@ -827,7 +833,7 @@ function getStyles() {
       .settings-link:hover { color: #333; }
       .back:hover { color: #333; }
       .filter-tab:not(.active):hover { background: #ddd; }
-      .post-title:hover { text-decoration: underline; }
+      .post-item:hover .post-title { text-decoration: underline; }
       .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     }
   `;
