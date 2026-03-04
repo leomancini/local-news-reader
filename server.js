@@ -621,14 +621,21 @@ function getNeighborhoodPage(slug) {
         const mapId = 'map-' + i;
         const hasCoords = item.lat && item.lng;
         const hasAddress = !!item.address;
-        li.innerHTML =
-          (item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '') +
+        const hasMap = hasCoords || hasAddress;
+        const imgHtml = item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '';
+        const mapHtml = hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
+          : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
+          : '';
+        const topHtml = (item.image && hasMap)
+          ? '<div class="media-row">' + imgHtml + mapHtml + '</div>'
+          : imgHtml;
+        const bottomHtml = (!item.image && hasMap) ? mapHtml : '';
+
+        li.innerHTML = topHtml +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
           '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-          (hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
-           : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
-           : '');
+          bottomHtml;
 
         li.dataset.href = item.url;
         li.addEventListener('click', function(e) {
@@ -652,14 +659,25 @@ function getNeighborhoodPage(slug) {
           .then(geo => {
             const el = document.getElementById(mapId);
             if (!el || !geo.lat || !geo.lng) {
-              if (el) el.remove();
+              if (el) {
+                const row = el.closest('.media-row');
+                if (row) { const img = row.querySelector('.thumb'); if (img) row.parentNode.insertBefore(img, row); row.remove(); }
+                else el.remove();
+              }
               return;
             }
             el.className = 'card-map';
             el.classList.remove('card-map-placeholder');
             initMap(mapId, geo.lat, geo.lng);
           })
-          .catch(() => { const el = document.getElementById(mapId); if (el) el.remove(); });
+          .catch(() => {
+            const el = document.getElementById(mapId);
+            if (el) {
+              const row = el.closest('.media-row');
+              if (row) { const img = row.querySelector('.thumb'); if (img) row.parentNode.insertBefore(img, row); row.remove(); }
+              else el.remove();
+            }
+          });
       });
     }
 
@@ -822,6 +840,11 @@ function getStyles() {
     .meta { font-size: 14px; color: #888; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; height: 200px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; background: #eee; }
+    .media-row { display: flex; margin: -16px -16px 12px -16px; gap: 2px; }
+    .media-row .thumb { width: 50%; height: 200px; margin: 0; border-radius: 20px 0 0 0; flex-shrink: 0; }
+    .media-row .card-map { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; overflow: hidden; }
+    .media-row .card-map .leaflet-container { border-radius: 0 20px 0 0; }
+    .media-row .card-map-placeholder { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; background: #eee; animation: pulse 1.5s ease-in-out infinite; }
     .card-map { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; overflow: hidden; }
     .card-map .leaflet-container { border-radius: 0 0 20px 20px; }
     .card-map-placeholder { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; background: #eee; animation: pulse 1.5s ease-in-out infinite; }
