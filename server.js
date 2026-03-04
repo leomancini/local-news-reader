@@ -14,6 +14,29 @@ function slugToQuery(slug) {
   return slug.replace(/-/g, ' ');
 }
 
+// ── Wikipedia og:image cache (permanent, neighborhood images don't change) ──
+const wikiImageCache = new Map();
+
+async function fetchWikiImage(slug) {
+  const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  if (wikiImageCache.has(displayName)) return wikiImageCache.get(displayName);
+
+  for (const query of [`${displayName}, Queens`, displayName]) {
+    try {
+      const resp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const url = data.originalimage?.source || data.thumbnail?.source || '';
+      if (url) {
+        wikiImageCache.set(displayName, url);
+        return url;
+      }
+    } catch { /* try next */ }
+  }
+  wikiImageCache.set(displayName, '');
+  return '';
+}
+
 // ── Source caching (5 min TTL) ──
 const SOURCE_TTL = 5 * 60 * 1000;
 const sourceCache = new Map();
@@ -425,10 +448,11 @@ app.get('/', (req, res) => {
   res.send(getHomePage());
 });
 
-app.get('/:neighborhood', (req, res) => {
+app.get('/:neighborhood', async (req, res) => {
   const slug = req.params.neighborhood;
   if (slug === 'favicon.ico') return res.status(404).end();
-  res.send(getNeighborhoodPage(slug));
+  const ogImage = await fetchWikiImage(slug);
+  res.send(getNeighborhoodPage(slug, ogImage));
 });
 
 app.get('/:neighborhood/settings', (req, res) => {
@@ -469,7 +493,7 @@ function getHomePage() {
 </html>`;
 }
 
-function getNeighborhoodPage(slug) {
+function getNeighborhoodPage(slug, ogImage = '') {
   const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return `<!DOCTYPE html>
@@ -480,7 +504,7 @@ function getNeighborhoodPage(slug) {
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
   <title>Local news in ${displayName}</title>
   <meta property="og:title" content="Local news in ${displayName}">
-  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/JuniperSouth2.JPG/1280px-JuniperSouth2.JPG">
+  ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
