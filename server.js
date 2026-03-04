@@ -503,7 +503,7 @@ function getNeighborhoodPage(slug) {
         </div>
       </header>
       <div class="feed-container">
-        <div id="loading" class="loading">Loading news from all sources...</div>
+        <div id="loading" class="loading">Loading...</div>
         <ul id="feed" class="post-list"></ul>
       </div>
     </div>
@@ -828,12 +828,12 @@ function getStyles() {
     #page-settings h1 { margin-top: 16px; margin-bottom: 0; }
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
     .back:active { color: #666; }
-    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+    .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 20px 0 16px; flex-wrap: wrap; }
     .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { }
-    .loading { color: #999; font-size: 14px; padding: 20px 0; }
+    .loading { color: #999; font-size: 15px; }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
     .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; }
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
