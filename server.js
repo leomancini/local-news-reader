@@ -565,7 +565,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
         </div>
       </header>
       <div class="feed-container">
-        <div id="loading" class="loading">Loading...</div>
+        <div id="loading" class="loading"><div class="spinner"></div></div>
         <ul id="feed" class="post-list"></ul>
       </div>
     </div>
@@ -590,6 +590,15 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script>
     const SLUG = '${slug}';
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
+
+    function preloadThumb(src) {
+      return new Promise(function(resolve) {
+        var img = new Image();
+        img.onload = function() { resolve(img); };
+        img.onerror = function() { resolve(null); };
+        img.src = src;
+      });
+    }
 
     function isCrime(text) {
       const lower = text.toLowerCase();
@@ -657,14 +666,18 @@ function getNeighborhoodPage(slug, ogImage = '') {
       L.circleMarker([lat, lng], dotOpts).addTo(map);
     }
 
-    function renderFeed(items) {
-      document.getElementById('loading').remove();
+    async function renderFeed(items) {
+      const loadingEl = document.getElementById('loading');
       const ul = document.getElementById('feed');
 
       if (!items.length) {
         ul.innerHTML = '<li class="empty">No articles found</li>';
         return;
       }
+
+      // Preload all images first
+      const imgPromises = items.map(item => item.image ? preloadThumb(item.image) : Promise.resolve(null));
+      const loadedImages = await Promise.all(imgPromises);
 
       const pending = []; // items with address but no coords yet
 
@@ -684,20 +697,33 @@ function getNeighborhoodPage(slug, ogImage = '') {
         const hasCoords = item.lat && item.lng;
         const hasAddress = !!item.address;
         const hasMap = hasCoords || hasAddress;
-        const imgHtml = item.image ? '<img src="' + esc(item.image) + '" class="thumb" loading="lazy">' : '';
         const mapHtml = hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
           : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
           : '';
-        const topHtml = (item.image && hasMap)
-          ? '<div class="media-row">' + imgHtml + mapHtml + '</div>'
-          : imgHtml;
         const bottomHtml = (!item.image && hasMap) ? mapHtml : '';
+
+        // Build image HTML with preloaded dimensions
+        let topHtml = '';
+        const img = loadedImages[i];
+        if (img) {
+          img.className = 'thumb';
+          img.style.aspectRatio = img.naturalWidth + '/' + img.naturalHeight;
+          if (hasMap) {
+            topHtml = '<div class="media-row"><div class="thumb-slot"></div>' + mapHtml + '</div>';
+          } else {
+            topHtml = '<div class="thumb-slot"></div>';
+          }
+        }
 
         li.innerHTML = topHtml +
           '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
           '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
           bottomHtml;
+
+        // Replace placeholder with actual preloaded img element
+        const slot = li.querySelector('.thumb-slot');
+        if (slot && img) slot.replaceWith(img);
 
         li.dataset.href = item.url;
         li.addEventListener('click', function(e) {
@@ -712,6 +738,12 @@ function getNeighborhoodPage(slug, ogImage = '') {
         } else if (hasAddress) {
           pending.push({ mapId, address: item.address });
         }
+      });
+
+      // Remove loading text and fade in all cards at once
+      loadingEl.remove();
+      requestAnimationFrame(() => {
+        ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
       });
 
       // Lazily geocode uncached addresses and render maps as they resolve
@@ -747,7 +779,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       .then(r => r.json())
       .then(renderFeed)
       .catch(() => {
-        document.getElementById('loading').textContent = 'Failed to load news';
+        document.getElementById('loading').innerHTML = '<span style="color:#999;font-size:15px">Failed to load news</span>';
       });
 
     // Instant settings navigation — toggle visibility, no DOM destruction
@@ -896,11 +928,14 @@ function getStyles() {
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { }
-    .loading { color: #999; font-size: 15px; }
+    .loading { display: flex; justify-content: center; padding: 30vh 0 0; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #ddd; border-top-color: #999; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; }
+    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; opacity: 0; transition: opacity 0.3s; }
+    .post-item.visible { opacity: 1; }
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
-    .meta { font-size: 14px; color: #888; margin-top: 6px; display: block; }
+    .meta { font-size: 14px; color: #aaa; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; display: block; background: #f5f5f5; }
     .media-row { display: flex; margin: -16px -16px 12px -16px; gap: 2px; }
