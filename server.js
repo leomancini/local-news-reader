@@ -447,6 +447,22 @@ app.get('/api/geocode', async (req, res) => {
   res.json(result || { lat: null, lng: null });
 });
 
+app.get('/manifest.json', (req, res) => {
+  const startUrl = req.query.start || '/';
+  const displayName = startUrl === '/' ? 'Local News Reader'
+    : 'Local news in ' + startUrl.replace(/^\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  res.json({
+    name: displayName,
+    short_name: displayName,
+    description: 'Queens neighborhood news',
+    start_url: startUrl,
+    display: 'standalone',
+    background_color: '#f5f5f5',
+    theme_color: '#f5f5f5',
+    icons: [{ src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }]
+  });
+});
+
 // ── Pages ──
 app.get('/', (req, res) => {
   res.send(getHomePage());
@@ -524,8 +540,9 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Local news in ${displayName}">
   <meta name="theme-color" content="#f5f5f5">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="/manifest.json?start=/${slug}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" href="/splash-640x1136.png">
