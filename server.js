@@ -960,7 +960,7 @@ function getStyles() {
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { }
-    .loading { position: fixed; top: 43%; left: 50%; transform: translate(-50%, -50%); }
+    .loading { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); }
     .spinner { width: 48px; height: 48px; border: 4px solid #ddd; border-top-color: #999; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
