@@ -765,6 +765,10 @@ function getNeighborhoodPage(slug, ogImage = '') {
       loadingEl.remove();
       requestAnimationFrame(() => {
         ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
+        // After fade completes, remove transition so toggling visibility is instant
+        setTimeout(() => {
+          ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
+        }, 300);
       });
 
       // Lazily geocode uncached addresses and render maps as they resolve
