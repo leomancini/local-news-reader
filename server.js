@@ -589,6 +589,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
   <script>
     const SLUG = '${slug}';
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
 
     function preloadThumb(src) {
@@ -716,7 +717,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
         }
 
         li.innerHTML = topHtml +
-          '<a href="' + esc(item.url) + '" target="_blank" class="post-title">' + esc(item.title) + '</a>' +
+          '<a href="' + esc(item.url) + '"' + (isMobile ? '' : ' target="_blank"') + ' class="post-title">' + esc(item.title) + '</a>' +
           (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
           '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
           bottomHtml;
@@ -728,7 +729,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
         li.dataset.href = item.url;
         li.addEventListener('click', function(e) {
           if (e.target.closest('.card-map, .card-map-placeholder')) return;
-          window.open(this.dataset.href, '_blank');
+          if (isMobile) { location.href = this.dataset.href; } else { window.open(this.dataset.href, '_blank'); }
         });
 
         ul.appendChild(li);
