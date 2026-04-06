@@ -902,7 +902,7 @@ function getStyles() {
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
     .meta { font-size: 14px; color: #888; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; height: 200px; object-fit: cover; border-radius: 20px 20px 0 0; display: block; background: #f5f5f5; }
+    .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; display: block; background: #f5f5f5; }
     .media-row { display: flex; margin: -16px -16px 12px -16px; gap: 2px; }
     .media-row .thumb { width: 50%; height: 200px; margin: 0; border-radius: 20px 0 0 0; flex-shrink: 0; }
     .media-row .card-map { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; overflow: hidden; }
