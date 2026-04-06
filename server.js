@@ -474,6 +474,7 @@ function getHomePage() {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#f5f5f5">
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" href="/splash-640x1136.png">
@@ -524,6 +525,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#f5f5f5">
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" href="/splash-640x1136.png">
@@ -590,6 +592,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script>
     const SLUG = '${slug}';
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    document.addEventListener('touchstart', function() {}, { passive: true });
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
 
     function preloadThumb(src) {
@@ -935,7 +938,7 @@ function getStyles() {
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
     .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; opacity: 0; transition: opacity 0.3s; }
     .post-item.visible { opacity: 1; }
-    .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; }
+    .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; padding-right: 12px; }
     .meta { font-size: 14px; color: #aaa; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; display: block; background: #f5f5f5; }
@@ -956,7 +959,8 @@ function getStyles() {
       .settings-link:hover { color: #333; }
       .back:hover { color: #333; }
       .filter-tab:not(.active):hover { background: #ddd; }
-      .post-item:hover .post-title { text-decoration: underline; }
+      @media (hover: hover) { .post-item:hover .post-title { text-decoration: underline; } }
+      .post-item:active .post-title { text-decoration: underline; }
       .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     }
   `;
