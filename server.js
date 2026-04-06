@@ -687,18 +687,22 @@ function getNeighborhoodPage(slug, ogImage = '') {
       L.circleMarker([lat, lng], dotOpts).addTo(map);
     }
 
+    const feedStart = Date.now();
+
     async function renderFeed(items) {
       const loadingEl = document.getElementById('loading');
       const ul = document.getElementById('feed');
 
       if (!items.length) {
         ul.innerHTML = '<li class="empty">No articles found</li>';
+        loadingEl.remove();
         return;
       }
 
       // Preload all images first
       const imgPromises = items.map(item => item.image ? preloadThumb(item.image) : Promise.resolve(null));
       const loadedImages = await Promise.all(imgPromises);
+      const fast = Date.now() - feedStart < 500;
 
       const pending = []; // items with address but no coords yet
 
@@ -761,15 +765,18 @@ function getNeighborhoodPage(slug, ogImage = '') {
         }
       });
 
-      // Remove loading text and fade in all cards at once
+      // Remove loading text and show cards
       loadingEl.remove();
-      requestAnimationFrame(() => {
-        ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
-        // After fade completes, remove transition so toggling visibility is instant
-        setTimeout(() => {
-          ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
-        }, 300);
-      });
+      if (fast) {
+        ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
+      } else {
+        requestAnimationFrame(() => {
+          ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
+          setTimeout(() => {
+            ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
+          }, 300);
+        });
+      }
 
       // Lazily geocode uncached addresses and render maps as they resolve
       pending.forEach(({ mapId, address }) => {
