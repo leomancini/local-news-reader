@@ -475,11 +475,6 @@ app.get('/:neighborhood', async (req, res) => {
   res.send(getNeighborhoodPage(slug, ogImage));
 });
 
-app.get('/:neighborhood/settings', (req, res) => {
-  const slug = req.params.neighborhood;
-  if (req.query.partial) return res.send(getSettingsPartial(slug));
-  res.send(getSettingsPage(slug));
-});
 
 function getHomePage() {
   return `<!DOCTYPE html>
@@ -591,7 +586,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
     <div id="page-settings" style="display:none">
       <header>
-        <button type="button" class="back">&larr; ${displayName}</button>
+        <button type="button" class="back">&larr; Back</button>
         <h1>Settings</h1>
       </header>
       <div class="settings-list">
@@ -941,73 +936,6 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <\/script>
 </body>
 </html>`;
-}
-
-function getSettingsPage(slug) {
-  const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
-  <title>Settings - ${displayName}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
-  <style>${getStyles()}</style>
-</head>
-<body ontouchstart="">
-  <div class="container">
-    <header>
-      <a href="/${slug}" class="back">&larr; ${displayName}</a>
-      <h1>Settings</h1>
-    </header>
-
-    <div class="settings-list">
-      <div class="settings-row" id="crimeRow">
-        <div class="settings-label">
-          <span class="settings-title">Show crime stories</span>
-          <span class="settings-desc">Include articles about crime, police, and arrests</span>
-        </div>
-        <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const toggle = document.getElementById('crimeToggle');
-    const on = localStorage.getItem('showCrime') === '1';
-    if (on) toggle.classList.add('on');
-
-    toggle.addEventListener('click', () => {
-      const isOn = toggle.classList.toggle('on');
-      localStorage.setItem('showCrime', isOn ? '1' : '0');
-    });
-
-    // Back link uses normal navigation from standalone settings page
-  <\/script>
-</body>
-</html>`;
-}
-
-function getSettingsPartial(slug) {
-  const displayName = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  return `
-    <header>
-      <a href="/${slug}" class="back">&larr; ${displayName}</a>
-      <h1>Settings</h1>
-    </header>
-    <div class="settings-list">
-      <div class="settings-row" id="crimeRow">
-        <div class="settings-label">
-          <span class="settings-title">Show crime stories</span>
-          <span class="settings-desc">Include articles about crime, police, and arrests</span>
-        </div>
-        <div class="ios-toggle" id="crimeToggle"><div class="ios-knob"></div></div>
-      </div>
-    </div>`;
 }
 
 function getStyles() {
