@@ -686,6 +686,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       const map = L.map(id, mapOpts).setView([lat, lng], 15);
       L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
       L.circleMarker([lat, lng], dotOpts).addTo(map);
+      requestAnimationFrame(function() { map.invalidateSize(); });
     }
 
     const feedStart = Date.now();
