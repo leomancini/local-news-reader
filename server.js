@@ -609,7 +609,16 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script>
     const SLUG = '${slug}';
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    document.addEventListener('touchstart', function() {}, { passive: true });
+    document.addEventListener('touchstart', function(e) {
+      const li = e.target.closest('.post-item');
+      if (li) li.classList.add('pressed');
+    }, { passive: true });
+    document.addEventListener('touchend', function() {
+      document.querySelectorAll('.post-item.pressed').forEach(li => li.classList.remove('pressed'));
+    });
+    document.addEventListener('touchcancel', function() {
+      document.querySelectorAll('.post-item.pressed').forEach(li => li.classList.remove('pressed'));
+    });
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
 
     function preloadThumb(src) {
@@ -988,7 +997,7 @@ function getStyles() {
       .back:hover { color: #333; }
       .filter-tab:not(.active):hover { background: #ddd; }
       @media (hover: hover) { .post-item:hover .post-title { text-decoration: underline; } }
-      .post-item:active .post-title { text-decoration: underline; }
+      .post-item.pressed .post-title { text-decoration: underline; }
       .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     }
   `;
