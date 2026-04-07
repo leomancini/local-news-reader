@@ -752,7 +752,13 @@ function getNeighborhoodPage(slug, ogImage = '') {
         li.dataset.href = item.url;
         li.addEventListener('click', function(e) {
           if (e.target.closest('.card-map, .card-map-placeholder')) return;
-          if (isMobile) { location.href = this.dataset.href; } else { window.open(this.dataset.href, '_blank'); }
+          if (isMobile) {
+            var href = this.dataset.href;
+            this.querySelector('.post-title').style.textDecoration = 'underline';
+            setTimeout(function() { location.href = href; }, 100);
+          } else {
+            window.open(this.dataset.href, '_blank');
+          }
         });
 
         ul.appendChild(li);
