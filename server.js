@@ -607,6 +607,10 @@ function getNeighborhoodPage(slug, ogImage = '') {
   </div>
 
   <script>
+    window.addEventListener('pageshow', function() {
+      document.querySelectorAll('.post-title').forEach(function(el) { el.style.textDecoration = ''; });
+    });
+
     const SLUG = '${slug}';
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
