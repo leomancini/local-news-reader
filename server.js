@@ -568,7 +568,8 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
   <style>${getStyles()}</style>
 </head>
-<body ontouchstart="">
+<body ontouchstart="" class="feed-page">
+  <div id="loading" class="loading" style="opacity:0"><div class="spinner"></div></div>
   <div class="container">
     <div id="page-feed">
       <header>
@@ -584,7 +585,6 @@ function getNeighborhoodPage(slug, ogImage = '') {
         </div>
       </header>
       <div class="feed-container">
-        <div id="loading" class="loading"><div class="spinner"></div></div>
         <ul id="feed" class="post-list"></ul>
       </div>
     </div>
@@ -638,12 +638,19 @@ function getNeighborhoodPage(slug, ogImage = '') {
       });
     });
 
-    function filterFeed() {
+    async function filterFeed() {
       document.querySelectorAll('.post-item').forEach(el => {
         const sourceHidden = activeSource !== 'all' && el.dataset.source !== activeSource;
         const crimeHidden = el.dataset.crime === 'true' && !showCrime();
         el.style.display = (sourceHidden || crimeHidden) ? 'none' : '';
       });
+      // Load more if not enough visible posts
+      let visible = 0;
+      document.querySelectorAll('.post-item').forEach(el => { if (el.style.display !== 'none') visible++; });
+      if (visible < PAGE_SIZE && rendered < allItems.length) {
+        await loadMore();
+        filterFeed();
+      }
     }
 
     const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -687,115 +694,88 @@ function getNeighborhoodPage(slug, ogImage = '') {
     }
 
     const feedStart = Date.now();
+    const spinnerTimer = setTimeout(function() {
+      var el = document.getElementById('loading');
+      if (el) el.style.opacity = '1';
+    }, 300);
 
-    async function renderFeed(items) {
-      const loadingEl = document.getElementById('loading');
+    const PAGE_SIZE = 20;
+    let allItems = [];
+    let allImages = [];
+    let rendered = 0;
+    let loadingMore = false;
+    let mapCounter = 0;
+
+    function renderCard(item, img) {
       const ul = document.getElementById('feed');
+      const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
+      const li = document.createElement('li');
+      li.className = 'post-item';
+      li.dataset.crime = crime;
+      li.dataset.source = item.source;
+      const sourceHidden = activeSource !== 'all' && item.source !== activeSource;
+      if ((crime && !showCrime()) || sourceHidden) li.style.display = 'none';
 
-      if (!items.length) {
-        ul.innerHTML = '<li class="empty">No articles found</li>';
-        loadingEl.remove();
-        return;
+      const date = item.created ? timeAgo(item.created) : '';
+      const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source] || '';
+
+      const mapId = 'map-' + (mapCounter++);
+      const hasCoords = item.lat && item.lng;
+      const hasAddress = !!item.address;
+      const hasMap = hasCoords || hasAddress;
+      const mapHtml = hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
+        : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
+        : '';
+      const bottomHtml = (!item.image && hasMap) ? mapHtml : '';
+
+      let topHtml = '';
+      if (img) {
+        img.className = 'thumb';
+        img.style.aspectRatio = img.naturalWidth + '/' + img.naturalHeight;
+        if (hasMap) {
+          topHtml = '<div class="media-row"><div class="thumb-slot"></div>' + mapHtml + '</div>';
+        } else {
+          topHtml = '<div class="thumb-slot"></div>';
+        }
       }
 
-      // Preload all images first
-      const imgPromises = items.map(item => item.image ? preloadThumb(item.image) : Promise.resolve(null));
-      const loadedImages = await Promise.all(imgPromises);
-      const fast = Date.now() - feedStart < 500;
+      li.innerHTML = topHtml +
+        '<a href="' + esc(item.url) + '"' + (isMobile ? '' : ' target="_blank"') + ' class="post-title">' + esc(item.title) + '</a>' +
+        (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
+        '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
+        bottomHtml;
 
-      const pending = []; // items with address but no coords yet
+      const slot = li.querySelector('.thumb-slot');
+      if (slot && img) slot.replaceWith(img);
 
-      items.forEach((item, i) => {
-        const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
-        const li = document.createElement('li');
-        li.className = 'post-item';
-        li.dataset.crime = crime;
-        li.dataset.source = item.source;
-        const sourceHidden = activeSource !== 'all' && item.source !== activeSource;
-        if ((crime && !showCrime()) || sourceHidden) li.style.display = 'none';
-
-        const date = item.created ? timeAgo(item.created) : '';
-        const sourceLabel = { reddit: 'Reddit', qns: 'QNS', yimby: 'YIMBY' }[item.source] || '';
-
-        const mapId = 'map-' + i;
-        const hasCoords = item.lat && item.lng;
-        const hasAddress = !!item.address;
-        const hasMap = hasCoords || hasAddress;
-        const mapHtml = hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
-          : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
-          : '';
-        const bottomHtml = (!item.image && hasMap) ? mapHtml : '';
-
-        // Build image HTML with preloaded dimensions
-        let topHtml = '';
-        const img = loadedImages[i];
-        if (img) {
-          img.className = 'thumb';
-          img.style.aspectRatio = img.naturalWidth + '/' + img.naturalHeight;
-          if (hasMap) {
-            topHtml = '<div class="media-row"><div class="thumb-slot"></div>' + mapHtml + '</div>';
-          } else {
-            topHtml = '<div class="thumb-slot"></div>';
-          }
-        }
-
-        li.innerHTML = topHtml +
-          '<a href="' + esc(item.url) + '"' + (isMobile ? '' : ' target="_blank"') + ' class="post-title">' + esc(item.title) + '</a>' +
-          (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
-          '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-          bottomHtml;
-
-        // Replace placeholder with actual preloaded img element
-        const slot = li.querySelector('.thumb-slot');
-        if (slot && img) slot.replaceWith(img);
-
-        li.dataset.href = item.url;
-        if (isMobile) {
-          li.addEventListener('touchstart', function() {
-            this.querySelector('.post-title').style.textDecoration = 'underline';
-          }, { passive: true });
-          li.addEventListener('touchend', function() {
-            this.querySelector('.post-title').style.textDecoration = '';
-          });
-          li.addEventListener('touchcancel', function() {
-            this.querySelector('.post-title').style.textDecoration = '';
-          });
-        }
-        li.addEventListener('click', function(e) {
-          if (e.target.closest('.card-map, .card-map-placeholder')) return;
-          e.preventDefault();
-          if (isMobile) {
-            location.href = this.dataset.href;
-          } else {
-            window.open(this.dataset.href, '_blank');
-          }
+      li.dataset.href = item.url;
+      if (isMobile) {
+        li.addEventListener('touchstart', function() {
+          this.querySelector('.post-title').style.textDecoration = 'underline';
+        }, { passive: true });
+        li.addEventListener('touchend', function() {
+          this.querySelector('.post-title').style.textDecoration = '';
         });
-
-        ul.appendChild(li);
-
-        if (hasCoords) {
-          initMap(mapId, item.lat, item.lng);
-        } else if (hasAddress) {
-          pending.push({ mapId, address: item.address });
+        li.addEventListener('touchcancel', function() {
+          this.querySelector('.post-title').style.textDecoration = '';
+        });
+      }
+      li.addEventListener('click', function(e) {
+        if (e.target.closest('.card-map, .card-map-placeholder')) return;
+        e.preventDefault();
+        if (isMobile) {
+          location.href = this.dataset.href;
+        } else {
+          window.open(this.dataset.href, '_blank');
         }
       });
 
-      // Remove loading text and show cards
-      loadingEl.remove();
-      if (fast) {
-        ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
-      } else {
-        requestAnimationFrame(() => {
-          ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
-          setTimeout(() => {
-            ul.querySelectorAll('.post-item').forEach(li => { li.style.opacity = '1'; li.style.transition = 'none'; });
-          }, 300);
-        });
-      }
+      ul.appendChild(li);
 
-      // Lazily geocode uncached addresses and render maps as they resolve
-      pending.forEach(({ mapId, address }) => {
-        fetch('/api/geocode?q=' + encodeURIComponent(address) + '&neighborhood=' + SLUG)
+      if (hasCoords) {
+        initMap(mapId, item.lat, item.lng);
+      } else if (hasAddress) {
+        fetch('/api/geocode?q=' + encodeURIComponent(item.address) + '&neighborhood=' + SLUG)
           .then(r => r.json())
           .then(geo => {
             const el = document.getElementById(mapId);
@@ -819,6 +799,90 @@ function getNeighborhoodPage(slug, ogImage = '') {
               else el.remove();
             }
           });
+      }
+
+      return li;
+    }
+
+    async function loadMore() {
+      if (loadingMore || rendered >= allItems.length) return;
+      loadingMore = true;
+
+      // Load enough items to show PAGE_SIZE visible posts
+      let shown = 0;
+      let end = rendered;
+      while (end < allItems.length && shown < PAGE_SIZE) {
+        const item = allItems[end];
+        const sourceMatch = activeSource === 'all' || item.source === activeSource;
+        const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
+        const crimeMatch = !crime || showCrime();
+        if (sourceMatch && crimeMatch) shown++;
+        end++;
+      }
+
+      const batch = allItems.slice(rendered, end);
+      const batchImages = allImages.slice(rendered, end);
+      const imgs = await Promise.all(batch.map((item, i) => batchImages[rendered + i] || (item.image ? preloadThumb(item.image) : Promise.resolve(null))));
+
+      batch.forEach((item, i) => {
+        const li = renderCard(item, imgs[i]);
+        li.style.opacity = '1';
+        li.style.transition = 'none';
+      });
+
+      rendered = end;
+      loadingMore = false;
+    }
+
+    async function renderFeed(items) {
+      const loadingEl = document.getElementById('loading');
+      const ul = document.getElementById('feed');
+
+      if (!items.length) {
+        ul.innerHTML = '<li class="empty">No articles found</li>';
+        loadingEl.remove();
+        return;
+      }
+
+      allItems = items;
+      const firstBatch = items.slice(0, PAGE_SIZE);
+
+      // Preload images for first batch
+      const imgPromises = firstBatch.map(item => item.image ? preloadThumb(item.image) : Promise.resolve(null));
+      const loadedImages = await Promise.all(imgPromises);
+      const fast = Date.now() - feedStart < 500;
+
+      firstBatch.forEach((item, i) => renderCard(item, loadedImages[i]));
+      rendered = firstBatch.length;
+
+      // Preload remaining images in the background
+      allImages = new Array(items.length).fill(null);
+      items.slice(PAGE_SIZE).forEach((item, i) => {
+        if (item.image) {
+          preloadThumb(item.image).then(img => { allImages[PAGE_SIZE + i] = img; });
+        }
+      });
+
+      // Remove loading and show cards
+      clearTimeout(spinnerTimer);
+      loadingEl.remove();
+      document.querySelector('.container').style.visibility = 'visible';
+      if (!fast) {
+        ul.querySelectorAll('.post-item').forEach(li => li.classList.add('hidden'));
+        requestAnimationFrame(() => {
+          ul.querySelectorAll('.post-item').forEach(li => li.classList.add('visible'));
+          setTimeout(() => {
+            ul.querySelectorAll('.post-item').forEach(li => { li.classList.remove('hidden', 'visible'); });
+          }, 300);
+        });
+      }
+
+      // Infinite scroll
+      window.addEventListener('scroll', function() {
+        if (rendered >= allItems.length) return;
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+          loadMore();
+        }
       });
     }
 
@@ -826,6 +890,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       .then(r => r.json())
       .then(renderFeed)
       .catch(() => {
+        document.querySelector('.container').style.visibility = 'visible';
         document.getElementById('loading').innerHTML = '<span style="color:#999;font-size:15px">Failed to load news</span>';
       });
 
@@ -950,6 +1015,7 @@ function getStyles() {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; font-size: 15px; background: #f5f5f5; color: #333; touch-action: pan-x pan-y; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     .container { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .feed-page .container { visibility: hidden; }
     header { margin-bottom: 24px; }
     h1 { font-family: 'Lora', Georgia, serif; font-size: 40px; line-height: 1; margin: 0 0 12px; padding: 0; }
     h2 { font-size: 16px; margin-bottom: 12px; }
@@ -971,7 +1037,7 @@ function getStyles() {
     .back { color: #666; text-decoration: none; font-size: 14px; display: inline-block; margin-bottom: 8px; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
     .back:active { color: #666; }
     .filter-tabs { display: flex; align-items: center; gap: 8px; margin: 20px 0 16px; flex-wrap: wrap; }
-    .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .filter-tab { padding: 6px 16px; border: none; border-radius: 20px; background: #e8e8e8; color: #666; font-family: system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
     .filter-tab.active { background: #333; color: #fff; }
     * { -webkit-tap-highlight-color: transparent; }
     .feed-container { }
@@ -979,8 +1045,9 @@ function getStyles() {
     .spinner { width: 48px; height: 48px; border: 4px solid #ddd; border-top-color: #999; border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .post-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; opacity: 0; transition: opacity 0.3s; }
-    .post-item.visible { opacity: 1; }
+    .post-item { padding: 16px; background: #fff; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); cursor: pointer; }
+    .post-item.hidden { opacity: 0; transition: opacity 0.3s; }
+    .post-item.hidden.visible { opacity: 1; }
     .post-title { font-family: 'Lora', Georgia, serif; color: #333; text-decoration: none; font-size: 20px; font-weight: 700; display: block; line-height: 1.3; padding-right: 12px; }
     .meta { font-size: 14px; color: #aaa; margin-top: 6px; display: block; }
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
