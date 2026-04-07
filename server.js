@@ -511,7 +511,7 @@ function getHomePage() {
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
   <style>${getStyles()}</style>
 </head>
-<body>
+<body ontouchstart="">
   <div class="container">
     <h1>Local News Reader</h1>
     <p>Queens neighborhood news from Reddit, QNS, and YIMBY.</p>
@@ -568,7 +568,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
   <style>${getStyles()}</style>
 </head>
-<body>
+<body ontouchstart="">
   <div class="container">
     <div id="page-feed">
       <header>
@@ -609,16 +609,6 @@ function getNeighborhoodPage(slug, ogImage = '') {
   <script>
     const SLUG = '${slug}';
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    document.addEventListener('touchstart', function(e) {
-      const li = e.target.closest('.post-item');
-      if (li) li.classList.add('pressed');
-    }, { passive: true });
-    document.addEventListener('touchend', function() {
-      document.querySelectorAll('.post-item.pressed').forEach(li => li.classList.remove('pressed'));
-    });
-    document.addEventListener('touchcancel', function() {
-      document.querySelectorAll('.post-item.pressed').forEach(li => li.classList.remove('pressed'));
-    });
     const CRIME_KEYWORDS = ['crime', 'shooting', 'stabbing', 'robbery', 'assault', 'murder', 'arrest', 'theft', 'burglary', 'homicide', 'nypd', 'police', 'suspect', 'victim', 'fatal'];
 
     function preloadThumb(src) {
@@ -887,7 +877,7 @@ function getSettingsPage(slug) {
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&display=swap" rel="stylesheet">
   <style>${getStyles()}</style>
 </head>
-<body>
+<body ontouchstart="">
   <div class="container">
     <header>
       <a href="/${slug}" class="back">&larr; ${displayName}</a>
@@ -997,7 +987,7 @@ function getStyles() {
       .back:hover { color: #333; }
       .filter-tab:not(.active):hover { background: #ddd; }
       @media (hover: hover) { .post-item:hover .post-title { text-decoration: underline; } }
-      .post-item.pressed .post-title { text-decoration: underline; }
+      .post-item:active .post-title { text-decoration: underline; }
       .hood-grid a:hover { background: #333; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     }
   `;
