@@ -817,7 +817,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
       const batch = allItems.slice(rendered, end);
       const batchImages = allImages.slice(rendered, end);
-      const imgs = await Promise.all(batch.map((item, i) => batchImages[rendered + i] || (item.image ? preloadThumb(item.image) : Promise.resolve(null))));
+      const imgs = await Promise.all(batch.map((item, i) => batchImages[i] || (item.image ? preloadThumb(item.image) : Promise.resolve(null))));
 
       batch.forEach((item, i) => {
         const li = renderCard(item, imgs[i]);
