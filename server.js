@@ -682,11 +682,12 @@ function getNeighborhoodPage(slug, ogImage = '') {
     const mapOpts = { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false };
     const dotOpts = { radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0 };
 
+    var pendingMaps = [];
     function initMap(id, lat, lng) {
       const map = L.map(id, mapOpts).setView([lat, lng], 15);
       L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
       L.circleMarker([lat, lng], dotOpts).addTo(map);
-      requestAnimationFrame(function() { map.invalidateSize(); });
+      pendingMaps.push(map);
     }
 
     const feedStart = Date.now();
@@ -863,6 +864,10 @@ function getNeighborhoodPage(slug, ogImage = '') {
       clearTimeout(spinnerTimer);
       loadingEl.remove();
       document.querySelector('.container').style.visibility = 'visible';
+      requestAnimationFrame(function() {
+        pendingMaps.forEach(function(m) { m.invalidateSize(); });
+        pendingMaps = [];
+      });
       if (!fast) {
         ul.querySelectorAll('.post-item').forEach(li => li.classList.add('hidden'));
         requestAnimationFrame(() => {
