@@ -645,7 +645,12 @@ function getNeighborhoodPage(slug, ogImage = '') {
       if (visible < PAGE_SIZE && rendered < allItems.length) {
         await loadMore();
         filterFeed();
+        return;
       }
+      // Invalidate maps that were hidden and are now visible
+      requestAnimationFrame(function() {
+        allMaps.forEach(function(m) { m.invalidateSize(); });
+      });
     }
 
     const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -682,12 +687,12 @@ function getNeighborhoodPage(slug, ogImage = '') {
     const mapOpts = { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false };
     const dotOpts = { radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0 };
 
-    var pendingMaps = [];
+    var allMaps = [];
     function initMap(id, lat, lng) {
       const map = L.map(id, mapOpts).setView([lat, lng], 15);
       L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
       L.circleMarker([lat, lng], dotOpts).addTo(map);
-      pendingMaps.push(map);
+      allMaps.push(map);
     }
 
     const feedStart = Date.now();
@@ -865,8 +870,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       loadingEl.remove();
       document.querySelector('.container').style.visibility = 'visible';
       requestAnimationFrame(function() {
-        pendingMaps.forEach(function(m) { m.invalidateSize(); });
-        pendingMaps = [];
+        allMaps.forEach(function(m) { m.invalidateSize(); });
       });
       if (!fast) {
         ul.querySelectorAll('.post-item').forEach(li => li.classList.add('hidden'));
