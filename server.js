@@ -910,14 +910,14 @@ function getNeighborhoodPage(slug, ogImage = '') {
     function showSettings() {
       pageFeed.style.display = 'none';
       pageSettings.style.display = '';
-      document.title = 'Settings - ' + DISPLAY;
+      document.title = 'Settings';
       window.scrollTo(0, 0);
     }
 
     function showFeed() {
       pageSettings.style.display = 'none';
       pageFeed.style.display = '';
-      document.title = DISPLAY;
+      document.title = 'Local news in ' + DISPLAY;
       filterFeed();
     }
 
