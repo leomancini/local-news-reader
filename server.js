@@ -1021,7 +1021,7 @@ function getStyles() {
     .excerpt { font-size: 15px; color: #666; margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .thumb { width: calc(100% + 32px); margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; display: block; background: #f5f5f5; }
     .media-row { display: flex; margin: -16px -16px 12px -16px; gap: 2px; }
-    .media-row .thumb { width: 50%; height: 200px; margin: 0; border-radius: 20px 0 0 0; flex-shrink: 0; }
+    .media-row .thumb { width: 50%; height: 200px; margin: 0; border-radius: 20px 0 0 0; flex-shrink: 0; object-fit: cover; object-position: center; }
     .media-row .card-map { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; overflow: hidden; }
     .media-row .card-map .leaflet-container { border-radius: 0 20px 0 0; }
     .media-row .card-map-placeholder { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; background: #f5f5f5; animation: pulse 1.5s ease-in-out infinite; }
