@@ -99,8 +99,22 @@ const INTERSECTION_RE2 = new RegExp('([A-Z][a-z]+)\\s+(?:and|&)\\s+(\\d+\\w*\\s+
 // Words that should never appear between a house number and a street suffix
 const NON_STREET_WORD = /\b(?:for|the|an?|allegedly|reportedly|apparently|about|with|from|into|onto|over|under|just|only|also|even|still|that|this|were?|was|has|had|have|been|being|after|before|during|while)\b/i;
 
+// Colloquial landmark references — especially subway stations named after the
+// avenue they sit on — that the generic street parser misses or mis-locates.
+// Each is checked before generic parsing so a known landmark wins over an
+// unrelated street name that may appear elsewhere in the same post. e.g.
+// "Drug addicts outside Vernon Boulevard 7 station" must resolve to the
+// Vernon Blvd-Jackson Ave (7) station in Long Island City — not to a numbered
+// street that merely happens to appear later in the post body.
+const KNOWN_LANDMARKS = [
+  { match: /vernon\s+(?:blvd|boulevard)/i, address: 'Vernon Boulevard and Jackson Avenue' },
+];
+
 function extractAddress(text) {
   if (!text) return '';
+  for (const lm of KNOWN_LANDMARKS) {
+    if (lm.match.test(text)) return lm.address;
+  }
   const ix = INTERSECTION_RE.exec(text);
   if (ix) return (ix[1] + ' and ' + ix[2]).trim();
   const ix2 = INTERSECTION_RE2.exec(text);
@@ -731,8 +745,6 @@ function getNeighborhoodPage(slug, ogImage = '') {
       const mapHtml = hasCoords ? '<div class="card-map" id="' + mapId + '"></div>'
         : hasAddress ? '<div class="card-map-placeholder" id="' + mapId + '" data-address="' + esc(item.address) + '"></div>'
         : '';
-      const bottomHtml = (!item.image && hasMap) ? mapHtml : '';
-
       let topHtml = '';
       if (img) {
         img.className = 'thumb';
@@ -742,13 +754,15 @@ function getNeighborhoodPage(slug, ogImage = '') {
         } else {
           topHtml = '<div class="thumb-slot"></div>';
         }
+      } else if (hasMap) {
+        // No photo: show the map above the story text instead of below it.
+        topHtml = mapHtml;
       }
 
       li.innerHTML = topHtml +
         '<a href="' + esc(item.url) + '"' + (isMobile ? '' : ' target="_blank"') + ' class="post-title">' + esc(item.title) + '</a>' +
         (item.excerpt ? '<p class="excerpt">' + esc(item.excerpt) + '</p>' : '') +
-        '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>' +
-        bottomHtml;
+        '<span class="meta">' + sourceLabel + (date ? ' &middot; ' + date : '') + '</span>';
 
       const slot = li.querySelector('.thumb-slot');
       if (slot && img) slot.replaceWith(img);
@@ -1025,9 +1039,9 @@ function getStyles() {
     .media-row .card-map { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; overflow: hidden; }
     .media-row .card-map .leaflet-container { border-radius: 0 20px 0 0; }
     .media-row .card-map-placeholder { width: 50%; height: 200px; margin: 0; border-radius: 0 20px 0 0; background: #f5f5f5; animation: pulse 1.5s ease-in-out infinite; }
-    .card-map { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; overflow: hidden; }
-    .card-map .leaflet-container { border-radius: 0 0 20px 20px; }
-    .card-map-placeholder { width: calc(100% + 32px); height: 160px; margin: 10px -16px -16px -16px; border-radius: 0 0 20px 20px; background: #f5f5f5; animation: pulse 1.5s ease-in-out infinite; }
+    .card-map { width: calc(100% + 32px); height: 160px; margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; overflow: hidden; }
+    .card-map .leaflet-container { border-radius: 20px 20px 0 0; }
+    .card-map-placeholder { width: calc(100% + 32px); height: 160px; margin: -16px -16px 12px -16px; border-radius: 20px 20px 0 0; background: #f5f5f5; animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     .empty { color: #999; font-size: 14px; padding: 20px 0; }
     .hood-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
