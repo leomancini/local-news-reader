@@ -99,35 +99,14 @@ const INTERSECTION_RE2 = new RegExp('([A-Z][a-z]+)\\s+(?:and|&)\\s+(\\d+\\w*\\s+
 // Words that should never appear between a house number and a street suffix
 const NON_STREET_WORD = /\b(?:for|the|an?|allegedly|reportedly|apparently|about|with|from|into|onto|over|under|just|only|also|even|still|that|this|were?|was|has|had|have|been|being|after|before|during|while)\b/i;
 
-// Colloquial landmark references — especially subway stations named after the
-// avenue they sit on — that the generic street parser misses or mis-locates.
-// Each is checked before generic parsing so a known landmark wins over an
-// unrelated street name that may appear elsewhere in the same post. e.g.
-// "Drug addicts outside Vernon Boulevard 7 station" must resolve to the
-// Vernon Blvd-Jackson Ave (7) station in Long Island City — not to a numbered
-// street that merely happens to appear later in the post body.
-const KNOWN_LANDMARKS = [
-  // Vernon Blvd-Jackson Ave (7) station, Long Island City. Coordinates are
-  // hard-coded so the pin is always correct and the map never depends on a
-  // live geocode — the generic geocoder mis-locates this reference (it pinned
-  // to Ridgewood), and routing it as an intersection can return nothing,
-  // which would drop the map entirely.
-  { match: /vernon\s+(?:blvd|boulevard)/i, address: 'Vernon Blvd-Jackson Ave station', lat: 40.742626, lng: -73.953581 },
-];
-
-// Landmark address string -> fixed coordinates, for landmarks that resolve
-// directly without hitting the geocoder.
-const LANDMARK_COORDS = new Map(
-  KNOWN_LANDMARKS
-    .filter(l => l.lat != null && l.lng != null)
-    .map(l => [l.address, { lat: l.lat, lng: l.lng }])
-);
+// Standalone street name with no house number, e.g. "Vernon Boulevard",
+// "Northern Boulevard", "5th Avenue". Name tokens are title-cased words or
+// ordinals so this doesn't match arbitrary prose; a street suffix is required.
+const STREET_NAME_TOKEN = '(?:\\d+(?:st|nd|rd|th)?|[A-Z][a-zA-Z]+)';
+const STANDALONE_STREET_RE = new RegExp(STREET_NAME_TOKEN + '(?:\\s+' + STREET_NAME_TOKEN + '){0,2}\\s+' + STREET_SUFFIX);
 
 function extractAddress(text) {
   if (!text) return '';
-  for (const lm of KNOWN_LANDMARKS) {
-    if (lm.match.test(text)) return lm.address;
-  }
   const ix = INTERSECTION_RE.exec(text);
   if (ix) return (ix[1] + ' and ' + ix[2]).trim();
   const ix2 = INTERSECTION_RE2.exec(text);
@@ -136,21 +115,44 @@ function extractAddress(text) {
   if (!suffixMatch) return '';
   const before = text.substring(0, suffixMatch.index + suffixMatch[0].length);
   const m = before.match(new RegExp('(\\d+[-–]?\\d*\\s+(?:[NSEW]\\.\\s+)?(?:[\\w]+\\s+){0,4}' + STREET_SUFFIX + ')', 'i'));
-  if (!m) return '';
-  // Reject if the "street name" part contains common non-street words
-  const addr = m[1].trim();
-  const namePart = addr.replace(/^\d+[-–]?\d*\s+/, '').replace(new RegExp(STREET_SUFFIX + '$', 'i'), '').trim();
-  if (namePart && NON_STREET_WORD.test(namePart)) return '';
-  return addr;
+  if (m) {
+    // Reject if the "street name" part contains common non-street words
+    const addr = m[1].trim();
+    const namePart = addr.replace(/^\d+[-–]?\d*\s+/, '').replace(new RegExp(STREET_SUFFIX + '$', 'i'), '').trim();
+    if (namePart && NON_STREET_WORD.test(namePart)) return '';
+    return addr;
+  }
+  // No house number — fall back to a standalone street name (e.g. "Vernon
+  // Boulevard") so it still gets geocoded, qualified to the neighborhood.
+  const sm = STANDALONE_STREET_RE.exec(text);
+  if (sm) {
+    const addr = sm[0].trim();
+    const namePart = addr.replace(new RegExp('\\s+' + STREET_SUFFIX + '$'), '').trim();
+    if (namePart && NON_STREET_WORD.test(namePart)) return '';
+    return addr;
+  }
+  return '';
 }
 
 // ── Geocoding ──
 // Regular addresses → NYC GeoSearch (free, no API key)
-// Intersections → Claude Haiku (LLM knows NYC geography)
+// Intersections → Claude Haiku (LLM knows NYC geography), with GeoSearch fallback
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
+// The whole app covers Queens neighborhoods, so qualify every geocode query
+// with the borough/area context. This keeps ambiguous street names resolving
+// to the right neighborhood instead of a same-named street elsewhere.
+const AREA_CONTEXT = 'Queens, NY';
+
+function qualifyQuery(address, neighborhood) {
+  const parts = [address];
+  if (neighborhood) parts.push(neighborhood);
+  parts.push(AREA_CONTEXT);
+  return parts.join(', ');
+}
+
 async function geocodeAddress(address, neighborhood) {
-  const searchText = neighborhood ? `${address}, ${neighborhood}` : address;
+  const searchText = qualifyQuery(address, neighborhood);
   try {
     const resp = await fetch(`https://geosearch.planninglabs.nyc/v2/search?text=${encodeURIComponent(searchText)}&size=1`);
     const data = await resp.json();
@@ -164,8 +166,8 @@ async function geocodeAddress(address, neighborhood) {
 async function geocodeIntersection(address, neighborhood) {
   if (!ANTHROPIC_API_KEY) return null;
   const location = neighborhood
-    ? `${address} in ${neighborhood}, Queens, NY`
-    : `${address}, Queens, NY`;
+    ? `${address} in ${neighborhood}, ${AREA_CONTEXT}`
+    : `${address}, ${AREA_CONTEXT}`;
   try {
     // Ask LLM for a real nearby address, then geocode it precisely
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -196,8 +198,6 @@ const inflight = new Map(); // dedup concurrent geocode requests
 
 async function resolveGeocode(address, neighborhood) {
   if (!address) return null;
-  const landmark = LANDMARK_COORDS.get(address);
-  if (landmark) return landmark;
   const rkey = `${address}|${neighborhood}`;
 
   // Check cache (with TTL for null results)
@@ -213,9 +213,15 @@ async function resolveGeocode(address, neighborhood) {
 
   const promise = (async () => {
     const isIntersection = /\band\b/i.test(address);
-    const result = isIntersection
+    let result = isIntersection
       ? await geocodeIntersection(address, neighborhood)
       : await geocodeAddress(address, neighborhood);
+    // If the intersection (LLM) geocoder fails or is unavailable, fall back to
+    // the regular GeoSearch geocoder with the neighborhood-qualified query so
+    // the map still resolves instead of disappearing.
+    if (!result && isIntersection) {
+      result = await geocodeAddress(address, neighborhood);
+    }
 
     resolvedCache.set(rkey, { result, ts: Date.now() });
     cacheDirty = true;
@@ -229,8 +235,6 @@ async function resolveGeocode(address, neighborhood) {
 
 function getCachedGeocode(address, neighborhood) {
   if (!address) return null;
-  const landmark = LANDMARK_COORDS.get(address);
-  if (landmark) return landmark;
   const rkey = `${address}|${neighborhood}`;
   const cached = resolvedCache.get(rkey);
   if (!cached) return undefined;                                // never looked up
