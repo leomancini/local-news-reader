@@ -107,8 +107,21 @@ const NON_STREET_WORD = /\b(?:for|the|an?|allegedly|reportedly|apparently|about|
 // Vernon Blvd-Jackson Ave (7) station in Long Island City — not to a numbered
 // street that merely happens to appear later in the post body.
 const KNOWN_LANDMARKS = [
-  { match: /vernon\s+(?:blvd|boulevard)/i, address: 'Vernon Boulevard and Jackson Avenue' },
+  // Vernon Blvd-Jackson Ave (7) station, Long Island City. Coordinates are
+  // hard-coded so the pin is always correct and the map never depends on a
+  // live geocode — the generic geocoder mis-locates this reference (it pinned
+  // to Ridgewood), and routing it as an intersection can return nothing,
+  // which would drop the map entirely.
+  { match: /vernon\s+(?:blvd|boulevard)/i, address: 'Vernon Blvd-Jackson Ave station', lat: 40.742626, lng: -73.953581 },
 ];
+
+// Landmark address string -> fixed coordinates, for landmarks that resolve
+// directly without hitting the geocoder.
+const LANDMARK_COORDS = new Map(
+  KNOWN_LANDMARKS
+    .filter(l => l.lat != null && l.lng != null)
+    .map(l => [l.address, { lat: l.lat, lng: l.lng }])
+);
 
 function extractAddress(text) {
   if (!text) return '';
@@ -183,6 +196,8 @@ const inflight = new Map(); // dedup concurrent geocode requests
 
 async function resolveGeocode(address, neighborhood) {
   if (!address) return null;
+  const landmark = LANDMARK_COORDS.get(address);
+  if (landmark) return landmark;
   const rkey = `${address}|${neighborhood}`;
 
   // Check cache (with TTL for null results)
@@ -214,6 +229,8 @@ async function resolveGeocode(address, neighborhood) {
 
 function getCachedGeocode(address, neighborhood) {
   if (!address) return null;
+  const landmark = LANDMARK_COORDS.get(address);
+  if (landmark) return landmark;
   const rkey = `${address}|${neighborhood}`;
   const cached = resolvedCache.get(rkey);
   if (!cached) return undefined;                                // never looked up
