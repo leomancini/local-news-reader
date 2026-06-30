@@ -5,3 +5,4 @@ output.log
 .claude/
 geocode-cache.json
 
+reddit-ingest.json

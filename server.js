@@ -8,6 +8,7 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.static(join(__dirname, 'public')));
+app.use(express.json({ limit: '5mb' }));
 const port = 3126;
 
 function slugToSubreddit(slug) {
@@ -273,51 +274,54 @@ function upgradeYimbyImage(url) {
 }
 
 // ── Source fetchers (with caching) ──
-async function fetchReddit(slug) {
-  const key = `reddit:${slug}`;
-  const cached = getCached(key);
-  if (cached) return cached;
+// ── Reddit ingest store ──
+// Reddit blocks unauthenticated server-side reads of its RSS/JSON endpoints, so
+// posts are pushed to us by a Devvit app (runs on Reddit, reads the API with
+// proper auth) via POST /ingest/reddit. We persist the latest batch per
+// subreddit to disk and serve from it. See ../local-news-reader-devvit/.
+const INGEST_SECRET = process.env.INGEST_SECRET || '';
+const REDDIT_STORE_FILE = new URL('reddit-ingest.json', import.meta.url).pathname;
+const redditStore = new Map(); // subreddit(lowercase) → { posts: [...raw], ts }
 
-  const sub = slugToSubreddit(slug);
-  const resp = await fetch(`https://www.reddit.com/r/${sub}/.rss`, {
-    headers: { 'User-Agent': 'web:local-news-reader:v1.0 (by /u/local-news-aggregator)' }
-  });
-  const xml = await resp.text();
-  const posts = [];
-  const entryRegex = /<entry>[\s\S]*?<\/entry>/gi;
-  let match;
-  while ((match = entryRegex.exec(xml)) !== null) {
-    const entry = match[0];
-    const title = decodeHtmlEntities(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() || '');
-    const link = entry.match(/<link[^>]*href="([^"]*)"[^>]*\/>/)?.[1] || '';
-    const updated = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1] || '';
-    const content = entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || '';
-    let image = '';
-    const imgMatch = content.match(/&lt;img\s[^&]*src=&quot;([^&]*)&quot;/i)
-      || content.match(/<img[^>]*src="([^"]*)"[^>]*/i);
-    if (imgMatch) image = decodeHtmlEntities(imgMatch[1]);
-    const thumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]*)"/);
-    if (thumbMatch) image = decodeHtmlEntities(thumbMatch[1]);
-    if (image && image.includes('preview.redd.it') && !image.includes('external-preview')) {
-      const path = image.split('?')[0].replace('https://preview.redd.it/', '');
-      image = 'https://i.redd.it/' + path;
+(function loadRedditStore() {
+  try {
+    if (existsSync(REDDIT_STORE_FILE)) {
+      const obj = JSON.parse(readFileSync(REDDIT_STORE_FILE, 'utf8'));
+      for (const [sub, entry] of Object.entries(obj)) redditStore.set(sub, entry);
     }
-    const decoded = decodeHtmlEntities(decodeHtmlEntities(content));
-    const mdMatch = decoded.match(/<div class="md">([\s\S]*?)<\/div>/);
-    const body = mdMatch ? mdMatch[1] : decoded;
-    const excerpt = body
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/submitted by\s+.*$/i, '')
-      .replace(/\[link\]|\[comments\]/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 200);
-    const created = updated ? Math.floor(new Date(updated).getTime() / 1000) : 0;
-    const address = extractAddress(title) || extractAddress(excerpt);
-    posts.push({ title, url: link, created, image, excerpt, source: 'reddit', flair: '', address });
+  } catch (e) { console.error('[reddit] failed to load store:', e.message); }
+})();
+
+function saveRedditStore() {
+  try {
+    writeFileSync(REDDIT_STORE_FILE, JSON.stringify(Object.fromEntries(redditStore)));
+  } catch (e) { console.error('[reddit] failed to save store:', e.message); }
+}
+
+// Shape a raw ingested post into the feed item format used by the frontend.
+function shapeRedditPost(p, slug) {
+  const title = decodeHtmlEntities(p.title || '');
+  const link = p.permalink ? `https://www.reddit.com${p.permalink}` : (p.url || '');
+  const created = Math.floor(p.created_utc || 0);
+  const flair = p.flair || '';
+
+  let image = decodeHtmlEntities(p.image || '');
+  if (!image && /\.(jpe?g|png|gif|webp)$/i.test(p.url || '')) image = p.url;
+  if (image && image.includes('preview.redd.it') && !image.includes('external-preview')) {
+    const path = image.split('?')[0].replace('https://preview.redd.it/', '');
+    image = 'https://i.redd.it/' + path;
   }
-  if (posts.length > 0) setCache(key, posts);
-  return posts;
+
+  const excerpt = (p.selftext || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const address = extractAddress(title) || extractAddress(excerpt);
+  return { title, url: link, created, image, excerpt, source: 'reddit', flair, address };
+}
+
+async function fetchReddit(slug) {
+  const sub = slugToSubreddit(slug).toLowerCase();
+  const entry = redditStore.get(sub);
+  if (!entry || !Array.isArray(entry.posts)) return [];
+  return entry.posts.map(p => shapeRedditPost(p, slug));
 }
 
 async function fetchQns(slug) {
@@ -422,6 +426,26 @@ async function fetchYimby(slug) {
   if (articles.length > 0) setCache(key, articles);
   return articles;
 }
+
+// ── Reddit ingest endpoint (called by the Devvit sync app) ──
+app.post('/ingest/reddit', (req, res) => {
+  if (!INGEST_SECRET || req.get('X-Ingest-Secret') !== INGEST_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const posts = req.body?.posts;
+  if (!posts || typeof posts !== 'object') {
+    return res.status(400).json({ error: 'expected { posts: { subreddit: [...] } }' });
+  }
+  let count = 0;
+  for (const [sub, list] of Object.entries(posts)) {
+    if (!Array.isArray(list)) continue;
+    redditStore.set(sub.toLowerCase(), { posts: list, ts: Date.now() });
+    count += list.length;
+  }
+  saveRedditStore();
+  console.log(`[reddit] ingested ${count} posts across ${Object.keys(posts).length} subreddit(s)`);
+  res.json({ ok: true, subreddits: Object.keys(posts).length, posts: count });
+});
 
 // ── Combined feed endpoint (single request from frontend) ──
 app.get('/api/:neighborhood/feed', async (req, res) => {
