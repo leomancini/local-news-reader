@@ -11,16 +11,6 @@ app.use(express.static(join(__dirname, 'public')));
 app.use(express.json({ limit: '5mb' }));
 const port = 3126;
 
-// Neighborhood slugs whose subreddit name isn't just the de-hyphenated slug.
-// The Devvit ingest app must be configured with these exact subreddit names.
-const SUBREDDIT_ALIASES = {
-  'sunnyside': 'SunnysideQueens',
-};
-
-function slugToSubreddit(slug) {
-  return SUBREDDIT_ALIASES[slug] ?? slug.replace(/-/g, '');
-}
-
 function slugToQuery(slug) {
   return slug.replace(/-/g, ' ');
 }
@@ -280,30 +270,6 @@ function upgradeYimbyImage(url) {
 }
 
 // ── Source fetchers (with caching) ──
-// ── Reddit ingest store ──
-// Reddit blocks unauthenticated server-side reads of its RSS/JSON endpoints, so
-// posts are pushed to us by a Devvit app (runs on Reddit, reads the API with
-// proper auth) via POST /ingest/reddit. We persist the latest batch per
-// subreddit to disk and serve from it. See ../local-news-reader-devvit/.
-const INGEST_SECRET = process.env.INGEST_SECRET || '';
-const REDDIT_STORE_FILE = new URL('reddit-ingest.json', import.meta.url).pathname;
-const redditStore = new Map(); // subreddit(lowercase) → { posts: [...raw], ts }
-
-(function loadRedditStore() {
-  try {
-    if (existsSync(REDDIT_STORE_FILE)) {
-      const obj = JSON.parse(readFileSync(REDDIT_STORE_FILE, 'utf8'));
-      for (const [sub, entry] of Object.entries(obj)) redditStore.set(sub, entry);
-    }
-  } catch (e) { console.error('[reddit] failed to load store:', e.message); }
-})();
-
-function saveRedditStore() {
-  try {
-    writeFileSync(REDDIT_STORE_FILE, JSON.stringify(Object.fromEntries(redditStore)));
-  } catch (e) { console.error('[reddit] failed to save store:', e.message); }
-}
-
 // Shape a raw ingested post into the feed item format used by the frontend.
 function shapeRedditPost(p, slug) {
   const title = decodeHtmlEntities(p.title || '');
@@ -365,7 +331,7 @@ async function fetchReddit(slug) {
   if (now - redditCache.ts < REDDIT_TTL) return redditCache.items;
   if (redditInflight) return redditInflight;
 
-  const sub = slugToSubreddit(slug); // longislandcity
+  const sub = slug.replace(/-/g, ''); // longislandcity
   redditInflight = (async () => {
     try {
       const resp = await fetch(`https://www.reddit.com/r/${sub}/.rss?limit=25`, {
@@ -493,26 +459,6 @@ async function fetchYimby(slug) {
   if (articles.length > 0) setCache(key, articles);
   return articles;
 }
-
-// ── Reddit ingest endpoint (called by the Devvit sync app) ──
-app.post('/ingest/reddit', (req, res) => {
-  if (!INGEST_SECRET || req.get('X-Ingest-Secret') !== INGEST_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  const posts = req.body?.posts;
-  if (!posts || typeof posts !== 'object') {
-    return res.status(400).json({ error: 'expected { posts: { subreddit: [...] } }' });
-  }
-  let count = 0;
-  for (const [sub, list] of Object.entries(posts)) {
-    if (!Array.isArray(list)) continue;
-    redditStore.set(sub.toLowerCase(), { posts: list, ts: Date.now() });
-    count += list.length;
-  }
-  saveRedditStore();
-  console.log(`[reddit] ingested ${count} posts across ${Object.keys(posts).length} subreddit(s)`);
-  res.json({ ok: true, subreddits: Object.keys(posts).length, posts: count });
-});
 
 // ── Combined feed endpoint (single request from frontend) ──
 app.get('/api/:neighborhood/feed', async (req, res) => {
