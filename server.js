@@ -11,8 +11,14 @@ app.use(express.static(join(__dirname, 'public')));
 app.use(express.json({ limit: '5mb' }));
 const port = 3126;
 
+// Neighborhood slugs whose subreddit name isn't just the de-hyphenated slug.
+// The Devvit ingest app must be configured with these exact subreddit names.
+const SUBREDDIT_ALIASES = {
+  'sunnyside': 'SunnysideQueens',
+};
+
 function slugToSubreddit(slug) {
-  return slug.replace(/-/g, '');
+  return SUBREDDIT_ALIASES[slug] ?? slug.replace(/-/g, '');
 }
 
 function slugToQuery(slug) {
@@ -317,11 +323,72 @@ function shapeRedditPost(p, slug) {
   return { title, url: link, created, image, excerpt, source: 'reddit', flair, address };
 }
 
+// Reddit only enables one neighborhood. Reddit rate-limits (429) server-side
+// reads of www .rss, so we fetch at most once per hour and cache in memory;
+// failures back off a full hour to avoid hammering. Other neighborhoods get no
+// Reddit content (and their Reddit tab is hidden in the frontend).
+const REDDIT_ENABLED_SLUG = 'long-island-city';
+const REDDIT_TTL = 60 * 60 * 1000; // 1 hour
+const REDDIT_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36';
+let redditCache = { ts: 0, items: [] };
+let redditInflight = null;
+
+// Parse a Reddit Atom (.rss) feed into raw post objects shapeRedditPost accepts.
+function parseRedditRss(xml) {
+  const posts = [];
+  const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) || [];
+  for (const e of entries) {
+    const title = (e.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
+    const href = (e.match(/<link[^>]*href="([^"]+)"/) || [])[1] || '';
+    const when = (e.match(/<(?:updated|published)>([\s\S]*?)<\/(?:updated|published)>/) || [])[1] || '';
+    const content = decodeHtmlEntities((e.match(/<content[^>]*>([\s\S]*?)<\/content>/) || [])[1] || '');
+    let image = (e.match(/<media:thumbnail[^>]*url="([^"]+)"/) || [])[1] || '';
+    if (/^(default|self|nsfw|spoiler|image)$/i.test(image)) image = '';
+    if (!image) image = (content.match(/<img[^>]+src="([^"]+)"/) || [])[1] || '';
+    posts.push({
+      title: decodeHtmlEntities(title),
+      url: href,
+      permalink: '',
+      created_utc: when ? Math.floor(Date.parse(when) / 1000) : 0,
+      selftext: content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      flair: '',
+      image,
+    });
+  }
+  return posts;
+}
+
 async function fetchReddit(slug) {
-  const sub = slugToSubreddit(slug).toLowerCase();
-  const entry = redditStore.get(sub);
-  if (!entry || !Array.isArray(entry.posts)) return [];
-  return entry.posts.map(p => shapeRedditPost(p, slug));
+  if (slug !== REDDIT_ENABLED_SLUG) return [];
+  const now = Date.now();
+  if (now - redditCache.ts < REDDIT_TTL) return redditCache.items;
+  if (redditInflight) return redditInflight;
+
+  const sub = slugToSubreddit(slug); // longislandcity
+  redditInflight = (async () => {
+    try {
+      const resp = await fetch(`https://www.reddit.com/r/${sub}/.rss?limit=25`, {
+        headers: { 'User-Agent': REDDIT_UA, Accept: 'application/atom+xml, application/xml' },
+      });
+      if (!resp.ok) {
+        console.error(`[reddit] r/${sub} rss HTTP ${resp.status}; serving ${redditCache.items.length} cached`);
+        redditCache.ts = now; // back off an hour even on failure (esp. 429)
+        return redditCache.items;
+      }
+      const items = parseRedditRss(await resp.text()).map(p => shapeRedditPost(p, slug));
+      redditCache = { ts: now, items };
+      console.log(`[reddit] r/${sub} rss: ${items.length} posts`);
+      return items;
+    } catch (e) {
+      console.error(`[reddit] r/${sub} rss fetch failed:`, e.message);
+      redditCache.ts = now;
+      return redditCache.items;
+    } finally {
+      redditInflight = null;
+    }
+  })();
+  return redditInflight;
 }
 
 async function fetchQns(slug) {
@@ -578,6 +645,8 @@ function getHomePage() {
       <a href="/sunnyside">Sunnyside</a>
       <a href="/forest-hills">Forest Hills</a>
       <a href="/ridgewood">Ridgewood</a>
+      <a href="/middle-village">Middle Village</a>
+      <a href="/far-rockaway">Far Rockaway</a>
       <a href="/jamaica">Jamaica</a>
     </div>
   </div>
@@ -633,7 +702,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
         <h1>${displayName}</h1>
         <div class="filter-tabs">
           <button class="filter-tab active" data-source="all">All</button>
-          <button class="filter-tab" data-source="reddit">Reddit</button>
+          ${slug === REDDIT_ENABLED_SLUG ? '<button class="filter-tab" data-source="reddit">Reddit</button>' : ''}
           <button class="filter-tab" data-source="qns">QNS</button>
           <button class="filter-tab" data-source="yimby">YIMBY</button>
           <button type="button" class="settings-link" aria-label="Settings">
