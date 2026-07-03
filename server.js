@@ -248,11 +248,18 @@ const NAMED_ENTITIES = {
   copy: '©', reg: '®', trade: '™', '#39': "'",
 };
 
+// Reddit's Atom feed double-encodes HTML content (&amp;#39;), so decode
+// repeatedly until the string stops changing.
 function decodeHtmlEntities(str) {
-  return str
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
-    .replace(/&([a-z#0-9]+);/gi, (m, name) => NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? m);
+  for (let i = 0; i < 3; i++) {
+    const prev = str;
+    str = str
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+      .replace(/&([a-z#0-9]+);/gi, (m, name) => NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? m);
+    if (str === prev) break;
+  }
+  return str;
 }
 
 function upgradeQnsImage(url) {
