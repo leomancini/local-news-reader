@@ -773,10 +773,25 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
     var allMaps = [];
     function initMap(id, lat, lng) {
-      const map = L.map(id, mapOpts).setView([lat, lng], 15);
+      const el = document.getElementById(id);
+      if (!el) return;
+      const map = L.map(el, mapOpts).setView([lat, lng], 15);
       L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
       L.circleMarker([lat, lng], dotOpts).addTo(map);
       allMaps.push(map);
+      // Leaflet reads the container size at init. If the container isn't at its
+      // final width yet (still visibility:hidden, image reflow, filter unhide),
+      // only the left tiles load and the overlay clip is too small to paint the
+      // centered dot. Recompute size on the next frame and whenever it changes,
+      // then re-center so the marker stays put.
+      function refresh() {
+        map.invalidateSize({ animate: false });
+        map.setView([lat, lng], 15, { animate: false });
+      }
+      requestAnimationFrame(refresh);
+      if (window.ResizeObserver) {
+        new ResizeObserver(function() { refresh(); }).observe(el);
+      }
     }
 
     const feedStart = Date.now();
