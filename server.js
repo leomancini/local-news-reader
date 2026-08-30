@@ -136,6 +136,16 @@ function extractAddress(text) {
 // Intersections → Claude Haiku (LLM knows NYC geography), with GeoSearch fallback
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
+// ── Basemap tiles ──
+// CARTO basemaps now require an API key. Anonymous requests still return 200
+// with a real-looking tile, but every one is stamped "API KEY REQUIRED", so a
+// missing key shows up as watermarked maps rather than as a load failure.
+// Free key: https://carto.com/basemaps/apikey
+const CARTO_API_KEY = process.env.CARTO_API_KEY || '';
+if (!CARTO_API_KEY) {
+  console.warn('CARTO_API_KEY is not set - basemap tiles will be watermarked. Get a free key at https://carto.com/basemaps/apikey');
+}
+
 // The whole app covers Queens neighborhoods, so qualify every geocode query
 // with the borough/area context. This keeps ambiguous street names resolving
 // to the right neighborhood instead of a same-named street elsewhere.
@@ -542,6 +552,56 @@ app.get('/manifest.json', (req, res) => {
   });
 });
 
+// ── Basemap tile proxy ──
+// The CARTO key is attached server-side so it never ships in the public HTML.
+// Tiles are immutable per z/x/y, so responses are cached in memory and marked
+// immutable for the browser, which keeps the key's quota usage low.
+const TILE_CACHE_MAX = 2000;
+const tileCache = new Map();
+
+app.get('/map-tiles/:z/:x/:y', async (req, res) => {
+  const z = Number(req.params.z);
+  const x = Number(req.params.x);
+  const m = /^(\d{1,7})(@2x)?\.png$/.exec(req.params.y);
+  // Strict validation: these values are pasted into an upstream URL, so only
+  // in-range tile coordinates are allowed through.
+  if (!m || !Number.isInteger(z) || z < 0 || z > 20 || !Number.isInteger(x) || x < 0) {
+    return res.status(400).end();
+  }
+  const y = Number(m[1]);
+  const max = 2 ** z;
+  if (x >= max || y >= max) return res.status(400).end();
+
+  const retina = m[2] || '';
+  const key = `${z}/${x}/${y}${retina}`;
+  const hit = tileCache.get(key);
+  if (hit) {
+    // Refresh recency for the LRU eviction below.
+    tileCache.delete(key);
+    tileCache.set(key, hit);
+    res.set('Content-Type', hit.type);
+    res.set('Cache-Control', 'public, max-age=604800, immutable');
+    return res.end(hit.body);
+  }
+
+  const upstream = `https://basemaps.cartocdn.com/light_all/${z}/${x}/${y}${retina}.png`
+    + (CARTO_API_KEY ? `?api_key=${encodeURIComponent(CARTO_API_KEY)}` : '');
+  try {
+    const resp = await fetch(upstream);
+    if (!resp.ok) return res.status(resp.status).end();
+    const body = Buffer.from(await resp.arrayBuffer());
+    const type = resp.headers.get('content-type') || 'image/png';
+    if (tileCache.size >= TILE_CACHE_MAX) tileCache.delete(tileCache.keys().next().value);
+    tileCache.set(key, { body, type });
+    res.set('Content-Type', type);
+    res.set('Cache-Control', 'public, max-age=604800, immutable');
+    res.end(body);
+  } catch (err) {
+    console.error('Tile fetch failed', key, err.message);
+    res.status(502).end();
+  }
+});
+
 // ── Pages ──
 app.get('/', (req, res) => {
   res.send(getHomePage());
@@ -767,7 +827,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
     }
 
     const retina = window.devicePixelRatio > 1 ? '@2x' : '';
-    const tileUrl = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}' + retina + '.png';
+    const tileUrl = '/map-tiles/{z}/{x}/{y}' + retina + '.png';
     const mapOpts = { zoomControl: false, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, attributionControl: false };
     const dotOpts = { radius: 7, color: '#000', fillColor: '#000', fillOpacity: 1, weight: 0 };
 
