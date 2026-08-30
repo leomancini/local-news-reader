@@ -585,7 +585,7 @@ app.get('/map-tiles/:z/:x/:y', async (req, res) => {
   }
 
   const upstream = `https://basemaps.cartocdn.com/light_all/${z}/${x}/${y}${retina}.png`
-    + (CARTO_API_KEY ? `?api_key=${encodeURIComponent(CARTO_API_KEY)}` : '');
+    + (CARTO_API_KEY ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : '');
   try {
     const resp = await fetch(upstream);
     if (!resp.ok) return res.status(resp.status).end();
