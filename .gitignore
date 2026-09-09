@@ -6,3 +6,4 @@ output.log
 geocode-cache.json
 
 reddit-ingest.json
+translation-cache.json

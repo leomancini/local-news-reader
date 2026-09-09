@@ -83,9 +83,43 @@ function saveResolvedCache() {
   } catch { /* ignore */ }
 }
 
-setInterval(saveResolvedCache, 30_000);
-process.on('SIGTERM', saveResolvedCache);
-process.on('SIGINT', () => { saveResolvedCache(); process.exit(); });
+// ── Translation caching (persistent to disk) ──
+// Scraped titles/excerpts are translated into the reader's phone language on
+// demand (only when a client asks for a non-English feed) and cached by
+// (language, source text) so each string is sent to Claude at most once. The
+// feed itself is never cached here, so new posts always show up; they just get
+// translated the first time someone requests them.
+const TRANSLATION_CACHE_FILE = new URL('translation-cache.json', import.meta.url).pathname;
+const TRANSLATION_CACHE_MAX = 10_000; // entries; oldest evicted first
+const translationCache = new Map(); // `${lang}\n${text}` → translated text
+let translationDirty = false;
+
+try {
+  if (existsSync(TRANSLATION_CACHE_FILE)) {
+    const data = JSON.parse(readFileSync(TRANSLATION_CACHE_FILE, 'utf8'));
+    for (const [k, v] of Object.entries(data)) {
+      if (typeof v === 'string') translationCache.set(k, v);
+    }
+    console.log(`Loaded ${translationCache.size} cached translations`);
+  }
+} catch { /* start fresh */ }
+
+function saveTranslationCache() {
+  if (!translationDirty) return;
+  try {
+    writeFileSync(TRANSLATION_CACHE_FILE, JSON.stringify(Object.fromEntries(translationCache)));
+    translationDirty = false;
+  } catch { /* ignore */ }
+}
+
+function saveCaches() {
+  saveResolvedCache();
+  saveTranslationCache();
+}
+
+setInterval(saveCaches, 30_000);
+process.on('SIGTERM', saveCaches);
+process.on('SIGINT', () => { saveCaches(); process.exit(); });
 
 // ── Address extraction ──
 const STREET_SUFFIX = '(?:Street|St\\.?|Avenue|Ave\\.?|Boulevard|Blvd\\.?|Place|Pl\\.?|Road|Rd\\.?|Drive|Dr\\.?|Way|Court|Ct\\.?|Lane|Ln\\.?|Plaza|Broadway|Parkway|Pkwy\\.?)';
@@ -248,6 +282,177 @@ function getCachedGeocode(address, neighborhood) {
   if (cached.result !== null) return cached.result;             // positive hit
   if (Date.now() - cached.ts < NULL_TTL) return null;          // negative hit, still fresh
   return undefined;                                             // negative hit expired — treat as uncached
+}
+
+// ── Translation (Claude) ──
+// The client sends navigator.language (e.g. "es-MX", "zh-Hans-CN"). English
+// feeds are served untouched; anything else gets title + excerpt translated.
+const TRANSLATION_MODEL = process.env.TRANSLATION_MODEL || 'claude-opus-5';
+const TRANSLATION_CHUNK = 40;         // strings per Claude request
+const TRANSLATION_TIMEOUT = 45_000;   // ms per Claude request
+const translationInflight = new Map(); // cache key → Promise<string>
+
+// Turn a raw lang/Accept-Language value into a canonical BCP 47 tag, or ''.
+function normalizeLang(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  const tag = raw.split(',')[0].split(';')[0].trim();
+  if (!/^[a-z]{2,3}(-[a-z0-9]{1,8})*$/i.test(tag)) return '';
+  try { return Intl.getCanonicalLocales(tag)[0] || ''; } catch { return ''; }
+}
+
+function needsTranslation(lang) {
+  return !!lang && !/^en(-|$)/i.test(lang);
+}
+
+function languageLabel(lang) {
+  try {
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(lang);
+    return name && name !== lang ? `${name} (${lang})` : lang;
+  } catch { return lang; }
+}
+
+function translationKey(lang, text) {
+  return `${lang}\n${text}`;
+}
+
+function rememberTranslation(lang, text, translated) {
+  const key = translationKey(lang, text);
+  if (translationCache.size >= TRANSLATION_CACHE_MAX && !translationCache.has(key)) {
+    translationCache.delete(translationCache.keys().next().value);
+  }
+  translationCache.set(key, translated);
+  translationDirty = true;
+}
+
+// One Claude call: translate `strings` (≤ TRANSLATION_CHUNK) into `lang`.
+// Returns an array the same length as `strings`, or throws.
+async function translateChunk(strings, lang) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    signal: AbortSignal.timeout(TRANSLATION_TIMEOUT),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'server-side-fallback-2026-07-01',
+    },
+    body: JSON.stringify({
+      model: TRANSLATION_MODEL,
+      max_tokens: 8000,
+      fallbacks: 'default',
+      output_config: {
+        effort: 'low',
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              translations: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['translations'],
+            additionalProperties: false,
+          },
+        },
+      },
+      system: `You translate short local-news headlines and excerpts from English into ${languageLabel(lang)} for readers in Queens, New York.
+Translate each input string faithfully, keeping the same meaning, tone, and length; do not add, drop, summarize, or editorialize.
+Keep proper nouns as they are: street and place names, neighborhood names, business and organization names, people's names, and acronyms like NYPD, MTA, or DOB.
+Preserve punctuation such as a trailing ellipsis (…) that marks a cut-off excerpt.
+Return exactly one translation per input, in the same order as the inputs.`,
+      messages: [{
+        role: 'user',
+        content: `Translate these ${strings.length} strings. Input is a JSON array; reply with a JSON object whose "translations" array has one entry per input, in order.\n\n${JSON.stringify(strings)}`,
+      }],
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status}: ${data.error?.message || JSON.stringify(data).slice(0, 200)}`);
+  }
+  if (data.stop_reason === 'refusal') {
+    throw new Error(`refused (${data.stop_details?.category || 'unknown'})`);
+  }
+  if (data.stop_reason === 'max_tokens') throw new Error('hit max_tokens');
+  const text = data.content?.find(b => b.type === 'text')?.text;
+  if (!text) throw new Error('no text block in response');
+  const out = JSON.parse(text).translations;
+  if (!Array.isArray(out) || out.length !== strings.length || out.some(s => typeof s !== 'string')) {
+    throw new Error(`expected ${strings.length} translations, got ${Array.isArray(out) ? out.length : typeof out}`);
+  }
+  return out;
+}
+
+// Translate many strings, serving cached ones, deduping concurrent requests
+// for the same string, and batching the rest into a few Claude calls. Any
+// string that can't be translated falls back to its original text and is not
+// cached, so it's retried on the next request. Returns Map<original, translated>.
+async function translateStrings(strings, lang) {
+  const result = new Map();
+  const waiting = [];   // [text, promise] for strings another request is already translating
+  const todo = [];      // strings this request has to send to Claude
+  const seen = new Set();
+
+  for (const text of strings) {
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    const key = translationKey(lang, text);
+    const cached = translationCache.get(key);
+    if (cached !== undefined) { result.set(text, cached); continue; }
+    const pending = translationInflight.get(key);
+    if (pending) { waiting.push([text, pending]); continue; }
+    todo.push(text);
+  }
+
+  const chunks = [];
+  for (let i = 0; i < todo.length; i += TRANSLATION_CHUNK) chunks.push(todo.slice(i, i + TRANSLATION_CHUNK));
+
+  const chunkPromises = chunks.map(chunk => {
+    const p = translateChunk(chunk, lang).then(out => {
+      chunk.forEach((text, i) => rememberTranslation(lang, text, out[i]));
+      return new Map(chunk.map((text, i) => [text, out[i]]));
+    });
+    for (const text of chunk) {
+      const key = translationKey(lang, text);
+      // Never rejects: a failed chunk hands waiters the original text, so an
+      // unobserved failure can't become an unhandled rejection.
+      translationInflight.set(key, p.then(m => m.get(text), () => text).finally(() => translationInflight.delete(key)));
+    }
+    return p.then(
+      m => { for (const [text, t] of m) result.set(text, t); },
+      err => {
+        console.error(`[translate] ${lang} chunk of ${chunk.length} failed:`, err.message);
+        for (const text of chunk) result.set(text, text);
+      },
+    );
+  });
+
+  await Promise.all([
+    ...chunkPromises,
+    ...waiting.map(([text, p]) => p.then(t => result.set(text, t))),
+  ]);
+
+  if (chunks.length > 0) saveTranslationCache();
+  return result;
+}
+
+// Translate feed items in place. Originals are kept on `titleOriginal` /
+// `excerptOriginal` so the client can still keyword-filter on English text.
+async function translateItems(items, lang) {
+  if (!ANTHROPIC_API_KEY || items.length === 0) return items;
+  const strings = [];
+  for (const item of items) {
+    if (item.title) strings.push(item.title);
+    if (item.excerpt) strings.push(item.excerpt);
+  }
+  const map = await translateStrings(strings, lang);
+  for (const item of items) {
+    item.titleOriginal = item.title;
+    item.excerptOriginal = item.excerpt;
+    item.title = map.get(item.title) ?? item.title;
+    item.excerpt = map.get(item.excerpt) ?? item.excerpt;
+    item.lang = lang;
+  }
+  return items;
 }
 
 // ── HTML helpers ──
@@ -481,6 +686,12 @@ async function fetchYimby(slug) {
 app.get('/api/:neighborhood/feed', async (req, res) => {
   const slug = req.params.neighborhood;
   const neighborhood = slug.replace(/-/g, ' ').trim();
+  // Reader's phone language, sent by the client; falls back to the browser's
+  // Accept-Language header for direct API hits.
+  const lang = normalizeLang(req.query.lang || req.headers['accept-language']);
+  // The feed is assembled fresh on every request so readers always see the
+  // latest posts; don't let the browser or a proxy hold on to a response.
+  res.set('Cache-Control', 'no-store');
 
   try {
     const [reddit, qns, yimby] = await Promise.allSettled([
@@ -489,13 +700,23 @@ app.get('/api/:neighborhood/feed', async (req, res) => {
       fetchYimby(slug),
     ]);
 
+    // Shallow-copy: the source fetchers return their cached arrays, and the
+    // per-request steps below (translation, geocode attachment) mutate items.
     const items = [
       ...(reddit.status === 'fulfilled' ? reddit.value : []),
       ...(qns.status === 'fulfilled' ? qns.value : []),
       ...(yimby.status === 'fulfilled' ? yimby.value : []),
-    ];
+    ].map(item => ({ ...item }));
 
     items.sort((a, b) => (b.created || 0) - (a.created || 0));
+
+    // Translate scraped text into the reader's language before responding.
+    // Cached strings are free; only new posts cost a Claude call.
+    if (needsTranslation(lang)) {
+      try { await translateItems(items, lang); } catch (e) {
+        console.error(`[translate] ${lang} feed failed, serving English:`, e.message);
+      }
+    }
 
     // Attach cached geocode results (non-blocking)
     const uncached = [];
@@ -764,6 +985,12 @@ function getNeighborhoodPage(slug, ogImage = '') {
       return CRIME_KEYWORDS.some(k => lower.includes(k));
     }
 
+    // Crime keywords are English, so match against the untranslated text
+    // when the feed came back translated.
+    function crimeText(item) {
+      return (item.titleOriginal || item.title) + ' ' + (item.flair || '') + ' ' + (item.excerptOriginal || item.excerpt || '');
+    }
+
     function showCrime() { return localStorage.getItem('showCrime') === '1'; }
 
     let activeSource = 'all';
@@ -869,7 +1096,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
     function renderCard(item, img) {
       const ul = document.getElementById('feed');
-      const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
+      const crime = isCrime(crimeText(item));
       const li = document.createElement('li');
       li.className = 'post-item';
       li.dataset.crime = crime;
@@ -975,7 +1202,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       while (end < allItems.length && shown < PAGE_SIZE) {
         const item = allItems[end];
         const sourceMatch = activeSource === 'all' || item.source === activeSource;
-        const crime = isCrime(item.title + ' ' + (item.flair || '') + ' ' + (item.excerpt || ''));
+        const crime = isCrime(crimeText(item));
         const crimeMatch = !crime || showCrime();
         if (sourceMatch && crimeMatch) shown++;
         end++;
@@ -1006,6 +1233,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
       }
 
       allItems = items;
+      if (items[0] && items[0].lang) document.documentElement.lang = items[0].lang;
       const firstBatch = items.slice(0, PAGE_SIZE);
 
       // Preload images for first batch
@@ -1050,7 +1278,10 @@ function getNeighborhoodPage(slug, ogImage = '') {
       });
     }
 
-    fetch('/api/' + SLUG + '/feed')
+    // Ask for the feed in the phone's language; the server translates and
+    // caches, and serves English untouched.
+    const LANG = navigator.language || '';
+    fetch('/api/' + SLUG + '/feed?lang=' + encodeURIComponent(LANG))
       .then(r => r.json())
       .then(renderFeed)
       .catch(() => {
