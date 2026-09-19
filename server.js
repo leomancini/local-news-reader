@@ -642,7 +642,10 @@ async function fetchYimby(slug) {
   });
   const html = await resp.text();
   const articles = [];
-  const regex = /<article[^>]*>[\s\S]*?<\/article>/gi;
+  // Only the search results, which are `content-list` articles. The page also
+  // carries a "popular posts" sidebar of `cp-wrap` articles (site-wide
+  // reports, undated) that used to land at the bottom of every feed.
+  const regex = /<article[^>]*class="content-list[^"]*"[^>]*>[\s\S]*?<\/article>/gi;
   let match;
   while ((match = regex.exec(html)) !== null) {
     const block = match[0];
