@@ -529,7 +529,9 @@ function parseRedditRss(xml) {
   for (const e of entries) {
     const title = (e.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
     const href = (e.match(/<link[^>]*href="([^"]+)"/) || [])[1] || '';
-    const when = (e.match(/<(?:updated|published)>([\s\S]*?)<\/(?:updated|published)>/) || [])[1] || '';
+    // Sort by when the post went up. Reddit lists <updated> first, and an
+    // edit to an old (often pinned) post bumps it, so prefer <published>.
+    const when = (e.match(/<published>([\s\S]*?)<\/published>/) || e.match(/<updated>([\s\S]*?)<\/updated>/) || [])[1] || '';
     const content = decodeHtmlEntities((e.match(/<content[^>]*>([\s\S]*?)<\/content>/) || [])[1] || '');
     let image = (e.match(/<media:thumbnail[^>]*url="([^"]+)"/) || [])[1] || '';
     if (/^(default|self|nsfw|spoiler|image)$/i.test(image)) image = '';
@@ -556,7 +558,9 @@ async function fetchReddit(slug) {
   const sub = slug.replace(/-/g, ''); // longislandcity
   redditInflight = (async () => {
     try {
-      const resp = await fetch(`https://www.reddit.com/r/${sub}/.rss?limit=25`, {
+      // /new/ is the chronological listing; the default (hot) ranks by votes
+      // and can leave fresh posts out entirely.
+      const resp = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=25`, {
         headers: { 'User-Agent': REDDIT_UA, Accept: 'application/atom+xml, application/xml' },
       });
       if (!resp.ok) {
@@ -1071,14 +1075,24 @@ function getNeighborhoodPage(slug, ogImage = '') {
       // only the left tiles load and the overlay clip is too small to paint the
       // centered dot. Recompute size on the next frame and whenever it changes,
       // then re-center so the marker stays put.
+      let removed = false;
       function refresh() {
+        if (removed) return;
         map.invalidateSize({ animate: false });
         map.setView([lat, lng], 15, { animate: false });
       }
       requestAnimationFrame(refresh);
+      let observer = null;
       if (window.ResizeObserver) {
-        new ResizeObserver(function() { refresh(); }).observe(el);
+        observer = new ResizeObserver(function() { refresh(); });
+        observer.observe(el);
       }
+      // A feed refresh removes old maps; the detached container still fires
+      // one last resize, which must not touch the torn-down map.
+      map.on('unload', function() {
+        removed = true;
+        if (observer) observer.disconnect();
+      });
     }
 
     const feedStart = Date.now();
@@ -1093,6 +1107,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
     let rendered = 0;
     let loadingMore = false;
     let mapCounter = 0;
+    let feedGen = 0; // bumped by resetFeed so in-flight renders of the old list bail
 
     function renderCard(item, img) {
       const ul = document.getElementById('feed');
@@ -1210,7 +1225,9 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
       const batch = allItems.slice(rendered, end);
       const batchImages = allImages.slice(rendered, end);
+      const gen = feedGen;
       const imgs = await Promise.all(batch.map((item, i) => batchImages[i] || (item.image ? preloadThumb(item.image) : Promise.resolve(null))));
+      if (gen !== feedGen) return; // feed was replaced while images loaded
 
       batch.forEach((item, i) => {
         const li = renderCard(item, imgs[i]);
@@ -1222,27 +1239,43 @@ function getNeighborhoodPage(slug, ogImage = '') {
       loadingMore = false;
     }
 
+    // Tear down the rendered feed so renderFeed can draw a fresh list.
+    function resetFeed() {
+      allMaps.forEach(function(m) { m.remove(); });
+      allMaps = [];
+      document.getElementById('feed').innerHTML = '';
+      allItems = [];
+      allImages = [];
+      rendered = 0;
+      loadingMore = false;
+      feedGen++;
+    }
+
     async function renderFeed(items) {
       const loadingEl = document.getElementById('loading');
       const ul = document.getElementById('feed');
 
       if (!items.length) {
         ul.innerHTML = '<li class="empty">No articles found</li>';
-        loadingEl.remove();
+        if (loadingEl) loadingEl.remove();
         return;
       }
 
       allItems = items;
+      loadingMore = true; // hold off infinite scroll until the first page is in
       if (items[0] && items[0].lang) document.documentElement.lang = items[0].lang;
       const firstBatch = items.slice(0, PAGE_SIZE);
 
       // Preload images for first batch
+      const gen = feedGen;
       const imgPromises = firstBatch.map(item => item.image ? preloadThumb(item.image) : Promise.resolve(null));
       const loadedImages = await Promise.all(imgPromises);
+      if (gen !== feedGen) return; // feed was replaced while images loaded
       const fast = Date.now() - feedStart < 500;
 
       firstBatch.forEach((item, i) => renderCard(item, loadedImages[i]));
       rendered = firstBatch.length;
+      loadingMore = false;
 
       // Preload remaining images in the background
       allImages = new Array(items.length).fill(null);
@@ -1254,7 +1287,7 @@ function getNeighborhoodPage(slug, ogImage = '') {
 
       // Remove loading and show cards
       clearTimeout(spinnerTimer);
-      loadingEl.remove();
+      if (loadingEl) loadingEl.remove();
       document.querySelector('.container').style.visibility = 'visible';
       requestAnimationFrame(function() {
         allMaps.forEach(function(m) { m.invalidateSize(); });
@@ -1268,26 +1301,59 @@ function getNeighborhoodPage(slug, ogImage = '') {
           }, 300);
         });
       }
-
-      // Infinite scroll
-      window.addEventListener('scroll', function() {
-        if (rendered >= allItems.length) return;
-        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
-          loadMore();
-        }
-      });
     }
+
+    // Infinite scroll
+    window.addEventListener('scroll', function() {
+      if (rendered >= allItems.length) return;
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        loadMore();
+      }
+    });
 
     // Ask for the feed in the phone's language; the server translates and
     // caches, and serves English untouched.
     const LANG = navigator.language || '';
-    fetch('/api/' + SLUG + '/feed?lang=' + encodeURIComponent(LANG))
-      .then(r => r.json())
-      .then(renderFeed)
+    function fetchFeed() {
+      return fetch('/api/' + SLUG + '/feed?lang=' + encodeURIComponent(LANG))
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    }
+
+    let lastFetched = 0;
+    fetchFeed()
+      .then(items => { lastFetched = Date.now(); return renderFeed(items); })
       .catch(() => {
         document.querySelector('.container').style.visibility = 'visible';
         document.getElementById('loading').innerHTML = '<span style="color:#999;font-size:15px">Failed to load news</span>';
       });
+
+    // As a home-screen app the page stays alive in the background for days,
+    // so without this a reopened app kept showing whatever it loaded last
+    // time. Refetch when the app comes back to the foreground (or is restored
+    // from the back/forward cache) and redraw only if the list changed.
+    const REFRESH_AFTER = 60 * 1000;
+    let refreshing = null;
+    function feedKey(items) { return items.map(i => i.url).join('|'); }
+    function refreshFeed() {
+      if (refreshing || document.hidden) return;
+      if (Date.now() - lastFetched < REFRESH_AFTER) return;
+      refreshing = fetchFeed()
+        .then(items => {
+          lastFetched = Date.now();
+          if (allItems.length && feedKey(items) === feedKey(allItems)) return;
+          resetFeed();
+          window.scrollTo(0, 0);
+          return renderFeed(items);
+        })
+        .catch(() => {}) // keep showing what we have; next foreground retries
+        .finally(() => { refreshing = null; });
+    }
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) refreshFeed();
+    });
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) refreshFeed();
+    });
 
     // Instant settings navigation — toggle visibility, no DOM destruction
     const pageFeed = document.getElementById('page-feed');
