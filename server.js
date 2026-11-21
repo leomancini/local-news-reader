@@ -463,7 +463,7 @@ const NAMED_ENTITIES = {
   copy: '©', reg: '®', trade: '™', '#39': "'",
 };
 
-// Reddit's Atom feed double-encodes HTML content (&amp;#39;), so decode
+// Reddit content can arrive double-encoded (&amp;#39;), so decode
 // repeatedly until the string stops changing.
 function decodeHtmlEntities(str) {
   for (let i = 0; i < 3; i++) {
@@ -511,42 +511,56 @@ function shapeRedditPost(p, slug) {
   return { title, url: link, created, image, excerpt, source: 'reddit', flair, address };
 }
 
-// Reddit only enables one neighborhood. Reddit rate-limits (429) server-side
-// reads of www .rss, so we fetch at most once per hour and cache in memory;
-// failures back off a full hour to avoid hammering. Other neighborhoods get no
-// Reddit content (and their Reddit tab is hidden in the frontend).
+// Reddit only enables one neighborhood. Reddit shut down its RSS feeds
+// (Nov 2026) and blocks server-side reads of its JSON listings, so posts come
+// from Arctic Shift, a third-party Reddit archive that mirrors new posts within
+// minutes. We fetch at most once per hour and cache in memory; failures back
+// off a full hour and keep serving the last good set. Other neighborhoods get
+// no Reddit content (and their Reddit tab is hidden in the frontend).
 const REDDIT_ENABLED_SLUG = 'long-island-city';
 const REDDIT_TTL = 60 * 60 * 1000; // 1 hour
-const REDDIT_UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36';
+const ARCTIC_SHIFT_URL = 'https://arctic-shift.photon-reddit.com/api/posts/search';
 let redditCache = { ts: 0, items: [] };
 let redditInflight = null;
 
-// Parse a Reddit Atom (.rss) feed into raw post objects shapeRedditPost accepts.
-function parseRedditRss(xml) {
+// Pick the best image off a raw Reddit post object: the link preview, the
+// first gallery image, or nothing. (Direct image links are handled by
+// shapeRedditPost from p.url.)
+function redditPostImage(p) {
+  const preview = p.preview?.images?.[0]?.source?.url;
+  if (preview) return preview;
+  const meta = p.media_metadata;
+  if (meta && typeof meta === 'object') {
+    const order = (p.gallery_data?.items || []).map(i => i.media_id);
+    for (const id of [...order, ...Object.keys(meta)]) {
+      const m = meta[id];
+      if (m?.e === 'Image' && m.s?.u) return m.s.u;
+    }
+  }
+  return '';
+}
+
+// Reduce Arctic Shift's raw Reddit post objects to what shapeRedditPost accepts,
+// dropping posts that were removed or deleted.
+function parseArcticShiftPosts(json) {
   const posts = [];
-  const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) || [];
-  for (const e of entries) {
-    const title = (e.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
-    const href = (e.match(/<link[^>]*href="([^"]+)"/) || [])[1] || '';
-    // Sort by when the post went up. Reddit lists <updated> first, and an
-    // edit to an old (often pinned) post bumps it, so prefer <published>.
-    const when = (e.match(/<published>([\s\S]*?)<\/published>/) || e.match(/<updated>([\s\S]*?)<\/updated>/) || [])[1] || '';
-    const content = decodeHtmlEntities((e.match(/<content[^>]*>([\s\S]*?)<\/content>/) || [])[1] || '');
-    let image = (e.match(/<media:thumbnail[^>]*url="([^"]+)"/) || [])[1] || '';
-    if (/^(default|self|nsfw|spoiler|image)$/i.test(image)) image = '';
-    if (!image) image = (content.match(/<img[^>]+src="([^"]+)"/) || [])[1] || '';
+  for (const p of json?.data || []) {
+    if (p.removed_by_category) continue;
+    const selftext = /^\[(removed|deleted)\]$/.test(p.selftext || '') ? '' : (p.selftext || '');
     posts.push({
-      title: decodeHtmlEntities(title),
-      url: href,
-      permalink: '',
-      created_utc: when ? Math.floor(Date.parse(when) / 1000) : 0,
-      selftext: content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-      flair: '',
-      image,
+      title: p.title || '',
+      url: p.url || '',
+      permalink: p.permalink || '',
+      created_utc: p.created_utc || 0,
+      // Self posts are markdown; flatten links and emphasis for the excerpt.
+      selftext: decodeHtmlEntities(selftext)
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\*\*|__|^#+\s*/gm, ''),
+      flair: (p.link_flair_text || '').trim(),
+      image: redditPostImage(p),
     });
   }
-  return posts;
+  return posts.sort((a, b) => b.created_utc - a.created_utc);
 }
 
 async function fetchReddit(slug) {
@@ -558,22 +572,21 @@ async function fetchReddit(slug) {
   const sub = slug.replace(/-/g, ''); // longislandcity
   redditInflight = (async () => {
     try {
-      // /new/ is the chronological listing; the default (hot) ranks by votes
-      // and can leave fresh posts out entirely.
-      const resp = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=25`, {
-        headers: { 'User-Agent': REDDIT_UA, Accept: 'application/atom+xml, application/xml' },
+      const resp = await fetch(`${ARCTIC_SHIFT_URL}?subreddit=${sub}&limit=25&sort=desc`, {
+        headers: { 'User-Agent': 'local-news-reader', Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
       });
       if (!resp.ok) {
-        console.error(`[reddit] r/${sub} rss HTTP ${resp.status}; serving ${redditCache.items.length} cached`);
-        redditCache.ts = now; // back off an hour even on failure (esp. 429)
+        console.error(`[reddit] r/${sub} arctic shift HTTP ${resp.status}; serving ${redditCache.items.length} cached`);
+        redditCache.ts = now; // back off an hour even on failure
         return redditCache.items;
       }
-      const items = parseRedditRss(await resp.text()).map(p => shapeRedditPost(p, slug));
+      const items = parseArcticShiftPosts(await resp.json()).map(p => shapeRedditPost(p, slug));
       redditCache = { ts: now, items };
-      console.log(`[reddit] r/${sub} rss: ${items.length} posts`);
+      console.log(`[reddit] r/${sub} arctic shift: ${items.length} posts`);
       return items;
     } catch (e) {
-      console.error(`[reddit] r/${sub} rss fetch failed:`, e.message);
+      console.error(`[reddit] r/${sub} arctic shift fetch failed:`, e.message);
       redditCache.ts = now;
       return redditCache.items;
     } finally {
